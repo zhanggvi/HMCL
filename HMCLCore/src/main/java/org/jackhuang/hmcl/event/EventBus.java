@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,13 +13,13 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.event;
 
 import org.jackhuang.hmcl.util.Logging;
 
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  *
@@ -27,12 +27,11 @@ import java.util.HashMap;
  */
 public final class EventBus {
 
-    private final HashMap<Class<?>, EventManager<?>> events = new HashMap<>();
+    private final ConcurrentHashMap<Class<?>, EventManager<?>> events = new ConcurrentHashMap<>();
 
     @SuppressWarnings("unchecked")
     public <T extends Event> EventManager<T> channel(Class<T> clazz) {
-        if (!events.containsKey(clazz))
-            events.put(clazz, new EventManager<>());
+        events.putIfAbsent(clazz, new EventManager<>());
         return (EventManager<T>) events.get(clazz);
     }
 

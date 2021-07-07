@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,12 +13,11 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.ui.construct;
 
 import com.jfoenix.controls.JFXButton;
-
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -28,18 +27,17 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
-
 import org.jackhuang.hmcl.setting.Theme;
 import org.jackhuang.hmcl.ui.Controllers;
 import org.jackhuang.hmcl.ui.FXUtils;
 import org.jackhuang.hmcl.ui.SVG;
 
-import static org.jackhuang.hmcl.ui.FXUtils.onInvalidating;
-import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
-
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+
+import static org.jackhuang.hmcl.ui.FXUtils.onInvalidating;
+import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
 
 public class FileItem extends BorderPane {
     private final Label lblPath = new Label();
@@ -63,7 +61,7 @@ public class FileItem extends BorderPane {
         right.setGraphic(SVG.pencil(Theme.blackFillBinding(), 15, 15));
         right.getStyleClass().add("toggle-icon4");
         right.setOnMouseClicked(e -> onExplore());
-        FXUtils.installTooltip(right, i18n("button.edit"));
+        FXUtils.installFastTooltip(right, i18n("button.edit"));
         setRight(right);
 
         Tooltip tip = new Tooltip();
@@ -77,7 +75,13 @@ public class FileItem extends BorderPane {
      * Converts the given path to absolute/relative(if possible) path according to {@link #convertToRelativePathProperty()}.
      */
     private String processPath(String path) {
-        Path given = Paths.get(path).toAbsolutePath();
+        Path given;
+        try {
+            given = Paths.get(path).toAbsolutePath();
+        } catch (IllegalArgumentException e) {
+            return path;
+        }
+
         if (isConvertToRelativePath()) {
             try {
                 return Paths.get(".").normalize().toAbsolutePath().relativize(given).normalize().toString();

@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,20 +13,36 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.download;
 
-import org.jackhuang.hmcl.download.forge.ForgeVersionList;
+import org.jackhuang.hmcl.download.fabric.FabricVersionList;
+import org.jackhuang.hmcl.download.forge.ForgeBMCLVersionList;
 import org.jackhuang.hmcl.download.game.GameVersionList;
 import org.jackhuang.hmcl.download.liteloader.LiteLoaderVersionList;
-import org.jackhuang.hmcl.download.optifine.OptiFineVersionList;
+import org.jackhuang.hmcl.download.optifine.OptiFineBMCLVersionList;
 
 /**
- * @see <a href="http://wiki.vg">http://wiki,vg</a>
+ * @see <a href="http://wiki.vg">http://wiki.vg</a>
  * @author huangyuhui
  */
 public class MojangDownloadProvider implements DownloadProvider {
+    private final GameVersionList game;
+    private final FabricVersionList fabric;
+    private final ForgeBMCLVersionList forge;
+    private final LiteLoaderVersionList liteLoader;
+    private final OptiFineBMCLVersionList optifine;
+
+    public MojangDownloadProvider() {
+        String apiRoot = "https://bmclapi2.bangbang93.com";
+
+        this.game = new GameVersionList(this);
+        this.fabric = new FabricVersionList(this);
+        this.forge = new ForgeBMCLVersionList(apiRoot);
+        this.liteLoader = new LiteLoaderVersionList(this);
+        this.optifine = new OptiFineBMCLVersionList(apiRoot);
+    }
 
     @Override
     public String getVersionListURL() {
@@ -42,13 +58,15 @@ public class MojangDownloadProvider implements DownloadProvider {
     public VersionList<?> getVersionListById(String id) {
         switch (id) {
             case "game":
-                return GameVersionList.INSTANCE;
+                return game;
+            case "fabric":
+                return fabric;
             case "forge":
-                return ForgeVersionList.INSTANCE;
+                return forge;
             case "liteloader":
-                return LiteLoaderVersionList.INSTANCE;
+                return liteLoader;
             case "optifine":
-                return OptiFineVersionList.INSTANCE;
+                return optifine;
             default:
                 throw new IllegalArgumentException("Unrecognized version list id: " + id);
         }
@@ -56,6 +74,11 @@ public class MojangDownloadProvider implements DownloadProvider {
 
     @Override
     public String injectURL(String baseURL) {
-            return baseURL;
+        return baseURL;
+    }
+
+    @Override
+    public int getConcurrency() {
+        return 6;
     }
 }

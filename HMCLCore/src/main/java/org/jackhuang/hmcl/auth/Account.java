@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,16 +13,20 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.auth;
-
-import org.jackhuang.hmcl.util.ObservableHelper;
-import org.jackhuang.hmcl.util.ToStringBuilder;
 
 import javafx.application.Platform;
 import javafx.beans.InvalidationListener;
 import javafx.beans.Observable;
+
+import javafx.beans.binding.Bindings;
+import javafx.beans.binding.ObjectBinding;
+import org.jackhuang.hmcl.auth.yggdrasil.Texture;
+import org.jackhuang.hmcl.auth.yggdrasil.TextureType;
+import org.jackhuang.hmcl.util.ToStringBuilder;
+import org.jackhuang.hmcl.util.javafx.ObservableHelper;
 
 import java.util.Map;
 import java.util.Optional;
@@ -54,7 +58,7 @@ public abstract class Account implements Observable {
      *
      * @throws CredentialExpiredException when the stored credentials has expired, in which case a password login will be performed
      */
-    public abstract AuthInfo logIn() throws CredentialExpiredException, AuthenticationException;
+    public abstract AuthInfo logIn() throws AuthenticationException;
 
     /**
      * Login with specified password.
@@ -69,7 +73,8 @@ public abstract class Account implements Observable {
 
     public abstract Map<Object, Object> toStorage();
 
-    public abstract void clearCache();
+    public void clearCache() {
+    }
 
     private ObservableHelper helper = new ObservableHelper(this);
 
@@ -89,6 +94,10 @@ public abstract class Account implements Observable {
      */
     protected void invalidate() {
         Platform.runLater(helper::invalidate);
+    }
+
+    public ObjectBinding<Optional<Map<TextureType, Texture>>> getTextures() {
+        return Bindings.createObjectBinding(Optional::empty);
     }
 
     @Override

@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,7 +13,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.ui.export;
 
@@ -25,15 +25,15 @@ import javafx.scene.control.Label;
 import javafx.scene.control.TreeItem;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
-
-import org.jackhuang.hmcl.game.ModAdviser;
+import org.jackhuang.hmcl.mod.ModAdviser;
 import org.jackhuang.hmcl.setting.Profile;
 import org.jackhuang.hmcl.ui.FXUtils;
 import org.jackhuang.hmcl.ui.construct.NoneMultipleSelectionModel;
 import org.jackhuang.hmcl.ui.wizard.WizardController;
 import org.jackhuang.hmcl.ui.wizard.WizardPage;
-import org.jackhuang.hmcl.util.FileUtils;
 import org.jackhuang.hmcl.util.StringUtils;
+import org.jackhuang.hmcl.util.io.FileUtils;
+
 import java.io.File;
 import java.util.LinkedList;
 import java.util.List;
@@ -73,9 +73,9 @@ public final class ModpackFileSelectionPage extends StackPane implements WizardP
         ModAdviser.ModSuggestion state = ModAdviser.ModSuggestion.SUGGESTED;
         if (basePath.length() > "minecraft/".length()) {
             state = adviser.advise(StringUtils.substringAfter(basePath, "minecraft/") + (file.isDirectory() ? "/" : ""), file.isDirectory());
-            if (file.isFile() && Objects.equals(FileUtils.getNameWithoutExtension(file), version))
+            if (file.isFile() && Objects.equals(FileUtils.getNameWithoutExtension(file), version)) // Ignore <version>.json, <version>.jar
                 state = ModAdviser.ModSuggestion.HIDDEN;
-            if (file.isDirectory() && Objects.equals(file.getName(), version + "-natives"))
+            if (file.isDirectory() && Objects.equals(file.getName(), version + "-natives")) // Ignore <version>-natives
                 state = ModAdviser.ModSuggestion.HIDDEN;
             if (state == ModAdviser.ModSuggestion.HIDDEN)
                 return null;
@@ -87,21 +87,24 @@ public final class ModpackFileSelectionPage extends StackPane implements WizardP
 
         if (file.isDirectory()) {
             File[] files = file.listFiles();
-            if (files != null)
+            if (files != null) {
                 for (File it : files) {
                     CheckBoxTreeItem<String> subNode = getTreeItem(it, basePath + "/" + it.getName());
-                if (subNode != null) {
-                    node.setSelected(subNode.isSelected() || node.isSelected());
-                    if (!subNode.isSelected())
-                        node.setIndeterminate(true);
-                    node.getChildren().add(subNode);
+                    if (subNode != null) {
+                        node.setSelected(subNode.isSelected() || node.isSelected());
+                        if (!subNode.isSelected()) {
+                            node.setIndeterminate(true);
+                        }
+                        node.getChildren().add(subNode);
+                    }
                 }
             }
             if (!node.isSelected()) node.setIndeterminate(false);
 
             // Empty folder need not to be displayed.
-            if (node.getChildren().isEmpty())
+            if (node.getChildren().isEmpty()) {
                 return null;
+            }
         }
 
         HBox graphic = new HBox();
@@ -126,12 +129,13 @@ public final class ModpackFileSelectionPage extends StackPane implements WizardP
 
     private void getFilesNeeded(CheckBoxTreeItem<String> node, String basePath, List<String> list) {
         if (node == null) return;
-        if (node.isSelected()) {
+        if (node.isSelected() || node.isIndeterminate()) {
             if (basePath.length() > "minecraft/".length())
                 list.add(StringUtils.substringAfter(basePath, "minecraft/"));
             for (TreeItem<String> child : node.getChildren()) {
-                if (child instanceof CheckBoxTreeItem)
+                if (child instanceof CheckBoxTreeItem) {
                     getFilesNeeded(((CheckBoxTreeItem<String>) child), basePath + "/" + child.getValue(), list);
+                }
             }
         }
     }
@@ -156,6 +160,7 @@ public final class ModpackFileSelectionPage extends StackPane implements WizardP
 
     public static final String MODPACK_FILE_SELECTION = "modpack.accepted";
     private static final Map<String, String> TRANSLATION = mapOf(
+            pair("minecraft/hmclversion.cfg", i18n("modpack.files.hmclversion_cfg")),
             pair("minecraft/servers.dat", i18n("modpack.files.servers_dat")),
             pair("minecraft/saves", i18n("modpack.files.saves")),
             pair("minecraft/mods", i18n("modpack.files.mods")),

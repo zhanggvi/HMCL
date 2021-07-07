@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,106 +13,85 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.task;
 
-import org.jackhuang.hmcl.util.IOUtils;
-import org.jackhuang.hmcl.util.Logging;
-import org.jackhuang.hmcl.util.NetworkUtils;
+import org.jackhuang.hmcl.util.io.FileUtils;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLConnection;
 import java.nio.charset.Charset;
-import java.util.logging.Level;
+import java.nio.file.Path;
+import java.util.*;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  *
- * @author huang
+ * @author huangyuhui
  */
-public final class GetTask extends TaskResult<String> {
+public final class GetTask extends FetchTask<String> {
 
-    private final URL url;
     private final Charset charset;
-    private final int retry;
-    private final String id;
 
     public GetTask(URL url) {
-        this(url, ID);
+        this(url, UTF_8);
     }
 
-    public GetTask(URL url, String id) {
-        this(url, id, UTF_8);
+    public GetTask(URL url, Charset charset) {
+        this(url, charset, 3);
     }
 
-    public GetTask(URL url, String id, Charset charset) {
-        this(url, id, charset, 5);
+    public GetTask(URL url, Charset charset, int retry) {
+        this(Collections.singletonList(url), charset, retry);
     }
 
-    public GetTask(URL url, String id, Charset charset, int retry) {
-        this.url = url;
+    public GetTask(List<URL> url) {
+        this(url, UTF_8, 3);
+    }
+
+    public GetTask(List<URL> urls, Charset charset, int retry) {
+        super(urls, retry);
         this.charset = charset;
-        this.retry = retry;
-        this.id = id;
 
-        setName(url.toString());
+        setName(urls.get(0).toString());
     }
 
     @Override
-    public Scheduler getScheduler() {
-        return Schedulers.io();
+    protected EnumCheckETag shouldCheckETag() {
+        return EnumCheckETag.CHECK_E_TAG;
     }
 
     @Override
-    public String getId() {
-        return id;
+    protected void useCachedResult(Path cachedFile) throws IOException {
+        setResult(FileUtils.readText(cachedFile));
     }
 
     @Override
-    public void execute() throws Exception {
-        Exception exception = null;
-        for (int time = 0; time < retry; ++time) {
-            if (time > 0)
-                Logging.LOG.log(Level.WARNING, "Failed to download, repeat times: " + time);
-            try {
-                updateProgress(0);
-                HttpURLConnection conn = NetworkUtils.createConnection(url);
-                InputStream input = conn.getInputStream();
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                byte[] buf = new byte[IOUtils.DEFAULT_BUFFER_SIZE];
-                int size = conn.getContentLength(), read = 0, len;
-                while ((len = input.read(buf)) != -1) {
-                    baos.write(buf, 0, len);
-                    read += len;
+    protected Context getContext(URLConnection conn, boolean checkETag) {
+        return new Context() {
+            final ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
-                    if (size >= 0)
-                        updateProgress(read, size);
-
-                    if (Thread.currentThread().isInterrupted())
-                        return;
-                }
-
-                if (size > 0 && size != read)
-                    throw new IllegalStateException("Not completed! Readed: " + read + ", total size: " + size);
-
-                setResult(baos.toString(charset.name()));
-                return;
-            } catch (IOException ex) {
-                exception = ex;
+            @Override
+            public void write(byte[] buffer, int offset, int len) {
+                baos.write(buffer, offset, len);
             }
-        }
-        if (exception != null)
-            throw exception;
-    }
 
-    /**
-     * The default task result ID.
-     */
-    public static final String ID = "http_get";
+            @Override
+            public void close() throws IOException {
+                if (!isSuccess()) return;
+
+                String result = baos.toString(charset.name());
+                setResult(result);
+
+                if (checkETag) {
+                    repository.cacheText(result, conn);
+                }
+            }
+        };
+    }
 
 }

@@ -1,6 +1,6 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -13,91 +13,113 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.auth.authlibinjector;
 
 import org.jackhuang.hmcl.auth.AuthInfo;
 import org.jackhuang.hmcl.auth.AuthenticationException;
 import org.jackhuang.hmcl.auth.CharacterSelector;
+import org.jackhuang.hmcl.auth.ServerDisconnectException;
+import org.jackhuang.hmcl.auth.yggdrasil.CompleteGameProfile;
+import org.jackhuang.hmcl.auth.yggdrasil.TextureType;
 import org.jackhuang.hmcl.auth.yggdrasil.YggdrasilAccount;
-import org.jackhuang.hmcl.auth.yggdrasil.YggdrasilService;
 import org.jackhuang.hmcl.auth.yggdrasil.YggdrasilSession;
 import org.jackhuang.hmcl.game.Arguments;
-import org.jackhuang.hmcl.task.GetTask;
-import org.jackhuang.hmcl.util.ExceptionalSupplier;
-import org.jackhuang.hmcl.util.Lang;
-import org.jackhuang.hmcl.util.NetworkUtils;
-
-import java.util.Base64;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.logging.Level;
+import org.jackhuang.hmcl.util.ToStringBuilder;
+import org.jackhuang.hmcl.util.function.ExceptionalSupplier;
+import java.io.IOException;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.jackhuang.hmcl.util.Logging.LOG;
-
-import java.io.IOException;
+import static java.util.Collections.emptySet;
+import static java.util.Collections.unmodifiableSet;
 
 public class AuthlibInjectorAccount extends YggdrasilAccount {
-    private AuthlibInjectorServer server;
-    private ExceptionalSupplier<AuthlibInjectorArtifactInfo, ? extends IOException> authlibInjectorDownloader;
+    private final AuthlibInjectorServer server;
+    private AuthlibInjectorArtifactProvider downloader;
 
-    protected AuthlibInjectorAccount(YggdrasilService service, AuthlibInjectorServer server, ExceptionalSupplier<AuthlibInjectorArtifactInfo, ? extends IOException> authlibInjectorDownloader, String username, UUID characterUUID, YggdrasilSession session) {
-        super(service, username, characterUUID, session);
-
-        this.authlibInjectorDownloader = authlibInjectorDownloader;
+    public AuthlibInjectorAccount(AuthlibInjectorServer server, AuthlibInjectorArtifactProvider downloader, String username, String password, CharacterSelector selector) throws AuthenticationException {
+        super(server.getYggdrasilService(), username, password, selector);
         this.server = server;
+        this.downloader = downloader;
+    }
+
+    public AuthlibInjectorAccount(AuthlibInjectorServer server, AuthlibInjectorArtifactProvider downloader, String username, YggdrasilSession session) {
+        super(server.getYggdrasilService(), username, session);
+        this.server = server;
+        this.downloader = downloader;
     }
 
     @Override
-    public AuthInfo logIn() throws AuthenticationException {
+    public synchronized AuthInfo logIn() throws AuthenticationException {
         return inject(super::logIn);
     }
 
     @Override
-    protected AuthInfo logInWithPassword(String password, CharacterSelector selector) throws AuthenticationException {
-        return inject(() -> super.logInWithPassword(password, selector));
+    public synchronized AuthInfo logInWithPassword(String password) throws AuthenticationException {
+        return inject(() -> super.logInWithPassword(password));
+    }
+
+    @Override
+    public Optional<AuthInfo> playOffline() {
+        Optional<AuthInfo> auth = super.playOffline();
+        Optional<AuthlibInjectorArtifactInfo> artifact = downloader.getArtifactInfoImmediately();
+        Optional<String> prefetchedMeta = server.getMetadataResponse();
+
+        if (auth.isPresent() && artifact.isPresent() && prefetchedMeta.isPresent()) {
+            return Optional.of(auth.get().withArguments(generateArguments(artifact.get(), server, prefetchedMeta.get())));
+        } else {
+            return Optional.empty();
+        }
     }
 
     private AuthInfo inject(ExceptionalSupplier<AuthInfo, AuthenticationException> loginAction) throws AuthenticationException {
-        // Pre-fetch metadata
-        GetTask metadataFetchTask = new GetTask(NetworkUtils.toURL(server.getUrl()));
-        Thread metadataFetchThread = Lang.thread(() -> {
+        CompletableFuture<String> prefetchedMetaTask = CompletableFuture.supplyAsync(() -> {
             try {
-                metadataFetchTask.run();
-            } catch (Exception e) {
-                LOG.log(Level.WARNING, "Failed to pre-fetch Yggdrasil metadata", e);
+                return server.fetchMetadataResponse();
+            } catch (IOException e) {
+                throw new CompletionException(new ServerDisconnectException(e));
             }
-        }, "Yggdrasil metadata fetch thread");
+        });
 
-        // Update authlib-injector
+        CompletableFuture<AuthlibInjectorArtifactInfo> artifactTask = CompletableFuture.supplyAsync(() -> {
+            try {
+                return downloader.getArtifactInfo();
+            } catch (IOException e) {
+                throw new CompletionException(new AuthlibInjectorDownloadException(e));
+            }
+        });
+
+        AuthInfo auth = loginAction.get();
+        String prefetchedMeta;
         AuthlibInjectorArtifactInfo artifact;
-        try {
-            artifact = authlibInjectorDownloader.get();
-        } catch (IOException e) {
-            throw new AuthenticationException("Failed to download authlib-injector", e);
-        }
 
-        // Perform authentication
-        AuthInfo info = loginAction.get();
-        Arguments arguments = new Arguments().addJVMArguments("-javaagent:" + artifact.getLocation().toString() + "=" + server.getUrl());
-
-        // Wait for metadata to be fetched
         try {
-            metadataFetchThread.join();
+            prefetchedMeta = prefetchedMetaTask.get();
+            artifact = artifactTask.get();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-        }
-        Optional<String> metadata = Optional.ofNullable(metadataFetchTask.getResult());
-        if (metadata.isPresent()) {
-            arguments = arguments.addJVMArguments(
-                    "-Dorg.to2mbn.authlibinjector.config.prefetched=" + Base64.getEncoder().encodeToString(metadata.get().getBytes(UTF_8)));
+            throw new AuthenticationException(e);
+        } catch (ExecutionException e) {
+            if (e.getCause() instanceof AuthenticationException) {
+                throw (AuthenticationException) e.getCause();
+            } else {
+                throw new AuthenticationException(e.getCause());
+            }
         }
 
-        return info.withArguments(arguments);
+        return auth.withArguments(generateArguments(artifact, server, prefetchedMeta));
+    }
+
+    private static Arguments generateArguments(AuthlibInjectorArtifactInfo artifact, AuthlibInjectorServer server, String prefetchedMeta) {
+        return new Arguments().addJVMArguments(
+                "-javaagent:" + artifact.getLocation().toString() + "=" + server.getUrl(),
+                "-Dauthlibinjector.side=client",
+                "-Dauthlibinjector.yggdrasil.prefetched=" + Base64.getEncoder().encodeToString(prefetchedMeta.getBytes(UTF_8)));
     }
 
     @Override
@@ -105,6 +127,12 @@ public class AuthlibInjectorAccount extends YggdrasilAccount {
         Map<Object, Object> map = super.toStorage();
         map.put("serverBaseURL", server.getUrl());
         return map;
+    }
+
+    @Override
+    public void clearCache() {
+        super.clearCache();
+        server.invalidateMetadataCache();
     }
 
     public AuthlibInjectorServer getServer() {
@@ -118,9 +146,36 @@ public class AuthlibInjectorAccount extends YggdrasilAccount {
 
     @Override
     public boolean equals(Object obj) {
-        if (!(obj instanceof AuthlibInjectorAccount))
+        if (obj == null || obj.getClass() != AuthlibInjectorAccount.class)
             return false;
         AuthlibInjectorAccount another = (AuthlibInjectorAccount) obj;
-        return super.equals(another) && server.equals(another.server);
+        return characterUUID.equals(another.characterUUID) && server.equals(another.server);
+    }
+
+    @Override
+    public String toString() {
+        return new ToStringBuilder(this)
+                .append("uuid", characterUUID)
+                .append("username", getUsername())
+                .append("server", getServer().getUrl())
+                .toString();
+    }
+
+    public static Set<TextureType> getUploadableTextures(CompleteGameProfile profile) {
+        String prop = profile.getProperties().get("uploadableTextures");
+        if (prop == null)
+            return emptySet();
+        Set<TextureType> result = EnumSet.noneOf(TextureType.class);
+        for (String val : prop.split(",")) {
+            val = val.toUpperCase();
+            TextureType parsed;
+            try {
+                parsed = TextureType.valueOf(val);
+            } catch (IllegalArgumentException e) {
+                continue;
+            }
+            result.add(parsed);
+        }
+        return unmodifiableSet(result);
     }
 }

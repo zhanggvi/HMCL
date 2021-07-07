@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,12 +13,13 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.game;
 
 import org.jackhuang.hmcl.util.Lang;
-import org.jackhuang.hmcl.util.OperatingSystem;
+import org.jackhuang.hmcl.util.platform.Architecture;
+import org.jackhuang.hmcl.util.platform.OperatingSystem;
 
 import java.util.regex.Pattern;
 
@@ -71,7 +72,7 @@ public final class OSRestriction {
                 return false;
 
         if (arch != null)
-            return !Lang.test(() -> !Pattern.compile(arch).matcher(OperatingSystem.SYSTEM_ARCHITECTURE).matches());
+            return !Lang.test(() -> !Pattern.compile(arch).matcher(Architecture.SYSTEM_ARCHITECTURE).matches());
 
         return true;
     }

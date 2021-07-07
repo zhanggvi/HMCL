@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,7 +13,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.ui.construct;
 
@@ -24,9 +24,12 @@ import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Rectangle;
@@ -38,13 +41,13 @@ import org.jackhuang.hmcl.ui.SVG;
 /**
  * @author huangyuhui
  */
-public class ComponentListCell extends StackPane {
+class ComponentListCell extends StackPane {
     private final Node content;
     private Animation expandAnimation;
     private Rectangle clipRect;
     private final BooleanProperty expanded = new SimpleBooleanProperty(this, "expanded", false);
 
-    public ComponentListCell(Node content) {
+    ComponentListCell(Node content) {
         this.content = content;
 
         updateLayout();
@@ -75,44 +78,57 @@ public class ComponentListCell extends StackPane {
             content.getStyleClass().remove("options-list");
             content.getStyleClass().add("options-sublist");
 
-            StackPane groupNode = new StackPane();
-            groupNode.getStyleClass().add("options-list-item-header");
+            BorderPane groupNode = new BorderPane();
 
             Node expandIcon = SVG.expand(Theme.blackFillBinding(), 10, 10);
             JFXButton expandButton = new JFXButton();
             expandButton.setGraphic(expandIcon);
             expandButton.getStyleClass().add("options-list-item-expand-button");
-            StackPane.setAlignment(expandButton, Pos.CENTER_RIGHT);
 
             VBox labelVBox = new VBox();
-            Label label = new Label();
-            label.textProperty().bind(list.titleProperty());
-            label.setMouseTransparent(true);
-            labelVBox.getChildren().add(label);
+            labelVBox.setAlignment(Pos.CENTER_LEFT);
 
-            if (list.isHasSubtitle()) {
-                Label subtitleLabel = new Label();
-                subtitleLabel.textProperty().bind(list.subtitleProperty());
-                subtitleLabel.setMouseTransparent(true);
-                subtitleLabel.getStyleClass().add("subtitle-label");
-                labelVBox.getChildren().add(subtitleLabel);
+            boolean overrideHeaderLeft = false;
+            if (list instanceof ComponentSublist) {
+                Node leftNode = ((ComponentSublist) list).getHeaderLeft();
+                if (leftNode != null) {
+                    labelVBox.getChildren().setAll(leftNode);
+                    overrideHeaderLeft = true;
+                }
             }
 
-            StackPane.setAlignment(labelVBox, Pos.CENTER_LEFT);
-            groupNode.getChildren().setAll(labelVBox, expandButton);
+            if (!overrideHeaderLeft) {
+                Label label = new Label();
+                label.textProperty().bind(list.titleProperty());
+                labelVBox.getChildren().add(label);
+
+                if (list.isHasSubtitle()) {
+                    Label subtitleLabel = new Label();
+                    subtitleLabel.textProperty().bind(list.subtitleProperty());
+                    subtitleLabel.getStyleClass().add("subtitle-label");
+                    labelVBox.getChildren().add(subtitleLabel);
+                }
+            }
+
+            groupNode.setLeft(labelVBox);
+
+            HBox right = new HBox();
+            right.setSpacing(16);
+            right.setAlignment(Pos.CENTER_RIGHT);
+            if (list instanceof ComponentSublist) {
+                Node rightNode = ((ComponentSublist) list).getHeaderRight();
+                if (rightNode != null)
+                    right.getChildren().add(rightNode);
+            }
+            right.getChildren().add(expandButton);
+            groupNode.setRight(right);
 
             VBox container = new VBox();
-            container.setStyle("-fx-padding: 8 0 0 0;");
+            container.setPadding(new Insets(8, 0, 0, 0));
             FXUtils.setLimitHeight(container, 0);
-            Rectangle clipRect = new Rectangle();
-            clipRect.widthProperty().bind(container.widthProperty());
-            clipRect.heightProperty().bind(container.heightProperty());
-            container.setClip(clipRect);
+            FXUtils.setOverflowHidden(container);
             container.getChildren().setAll(content);
-
-            VBox holder = new VBox();
-            holder.getChildren().setAll(groupNode, container);
-            holder.getStyleClass().add("options-list-item-container");
+            groupNode.setBottom(container);
 
             expandButton.setOnMouseClicked(e -> {
                 if (expandAnimation != null && expandAnimation.getStatus() == Animation.Status.RUNNING) {
@@ -127,6 +143,7 @@ public class ComponentListCell extends StackPane {
 
                 if (isExpanded()) {
                     updateClip(newHeight);
+                    list.onExpand();
                 }
 
                 expandAnimation = new Timeline(new KeyFrame(new Duration(320.0),
@@ -144,9 +161,10 @@ public class ComponentListCell extends StackPane {
             expandedProperty().addListener((a, b, newValue) ->
                     expandIcon.setRotate(newValue ? 180 : 0));
 
-            getChildren().setAll(holder);
-        } else
+            getChildren().setAll(groupNode);
+        } else {
             getChildren().setAll(content);
+        }
     }
 
     public boolean isExpanded() {

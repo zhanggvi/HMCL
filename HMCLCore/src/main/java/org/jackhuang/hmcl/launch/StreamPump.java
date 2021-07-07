@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,17 +13,17 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.launch;
 
-import org.jackhuang.hmcl.util.Constants;
 import org.jackhuang.hmcl.util.Logging;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.Charset;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 
@@ -49,17 +49,15 @@ final class StreamPump implements Runnable {
 
     @Override
     public void run() {
-        try {
-            try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream, Constants.SYSTEM_CHARSET))) {
-                String line;
-                while ((line = bufferedReader.readLine()) != null) {
-                    if (Thread.currentThread().isInterrupted()) {
-                        Thread.currentThread().interrupt();
-                        break;
-                    }
-
-                    callback.accept(line);
+        try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream, Charset.defaultCharset()))) {
+            String line;
+            while ((line = bufferedReader.readLine()) != null) {
+                if (Thread.currentThread().isInterrupted()) {
+                    Thread.currentThread().interrupt();
+                    break;
                 }
+
+                callback.accept(line);
             }
         } catch (IOException e) {
             Logging.LOG.log(Level.SEVERE, "An error occurred when reading stream", e);

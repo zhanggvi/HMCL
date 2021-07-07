@@ -15,11 +15,23 @@
         </top>
         <center>
             <VBox fx:id="list" styleClass="jfx-list-view" maxHeight="150" maxWidth="300">
+                <JFXButton fx:id="btnFabric" prefWidth="${list.width}">
+                    <graphic>
+                        <BorderPane mouseTransparent="true">
+                            <left>
+                                <Label fx:id="lblFabric"/>
+                            </left>
+                            <right>
+                                <fx:include source="/assets/svg/arrow-right.fxml"/>
+                            </right>
+                        </BorderPane>
+                    </graphic>
+                </JFXButton>
                 <JFXButton fx:id="btnForge" prefWidth="${list.width}">
                     <graphic>
                         <BorderPane mouseTransparent="true">
                             <left>
-                                <Label fx:id="lblForge">Install Forge</Label>
+                                <Label fx:id="lblForge"/>
                             </left>
                             <right>
                                 <fx:include source="/assets/svg/arrow-right.fxml"/>
@@ -31,7 +43,7 @@
                     <graphic>
                         <BorderPane mouseTransparent="true">
                             <left>
-                                <Label fx:id="lblLiteLoader">Install LiteLoader</Label>
+                                <Label fx:id="lblLiteLoader"/>
                             </left>
                             <right>
                                 <fx:include source="/assets/svg/arrow-right.fxml"/>
@@ -43,7 +55,7 @@
                     <graphic>
                         <BorderPane mouseTransparent="true">
                             <left>
-                                <Label fx:id="lblOptiFine">Install OptiFine</Label>
+                                <Label fx:id="lblOptiFine"/>
                             </left>
                             <right>
                                 <fx:include source="/assets/svg/arrow-right.fxml"/>

@@ -1,6 +1,6 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -13,14 +13,14 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.ui;
 
 import com.jfoenix.controls.*;
-import javafx.animation.Animation;
 import javafx.animation.Interpolator;
 import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.beans.InvalidationListener;
@@ -28,42 +28,57 @@ import javafx.beans.property.Property;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.beans.value.WeakChangeListener;
-import javafx.event.EventHandler;
+import javafx.beans.value.WritableValue;
 import javafx.fxml.FXMLLoader;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
-import javafx.scene.control.ListCell;
-import javafx.scene.control.ListView;
-import javafx.scene.control.ScrollBar;
-import javafx.scene.control.ScrollPane;
-import javafx.scene.control.Tooltip;
+import javafx.scene.control.*;
+import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import javafx.scene.input.MouseEvent;
-import javafx.scene.input.ScrollEvent;
+import javafx.scene.input.TransferMode;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.shape.Rectangle;
 import javafx.util.Callback;
 import javafx.util.Duration;
 import javafx.util.StringConverter;
-
-import org.jackhuang.hmcl.util.*;
+import org.jackhuang.hmcl.util.Logging;
+import org.jackhuang.hmcl.util.ResourceNotFoundError;
 import org.jackhuang.hmcl.util.i18n.I18n;
+import org.jackhuang.hmcl.util.io.FileUtils;
+import org.jackhuang.hmcl.util.javafx.ExtendedProperties;
+import org.jackhuang.hmcl.util.javafx.SafeStringConverter;
+import org.jackhuang.hmcl.util.platform.OperatingSystem;
 
 import java.io.File;
+import java.io.FileFilter;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.net.URI;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.List;
+import java.util.Objects;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.logging.Level;
+import java.util.stream.Collectors;
 
+import static org.jackhuang.hmcl.util.Lang.thread;
 import static org.jackhuang.hmcl.util.Lang.tryCast;
 
 public final class FXUtils {
     private FXUtils() {
+    }
+
+    public static void runInFX(Runnable runnable) {
+        if (Platform.isFxApplicationThread()) {
+            runnable.run();
+        } else {
+            Platform.runLater(runnable);
+        }
     }
 
     public static void checkFxUserThread() {
@@ -81,18 +96,25 @@ public final class FXUtils {
         value.addListener((a, b, c) -> consumer.accept(c));
     }
 
-    public static <T> void onWeakChange(ObservableValue<T> value, Consumer<T> consumer) {
-        value.addListener(new WeakChangeListener<>((a, b, c) -> consumer.accept(c)));
+    public static <T> WeakChangeListener<T> onWeakChange(ObservableValue<T> value, Consumer<T> consumer) {
+        WeakChangeListener<T> listener = new WeakChangeListener<>((a, b, c) -> consumer.accept(c));
+        value.addListener(listener);
+        return listener;
     }
 
     public static <T> void onChangeAndOperate(ObservableValue<T> value, Consumer<T> consumer) {
-        onChange(value, consumer);
         consumer.accept(value.getValue());
+        onChange(value, consumer);
     }
 
-    public static <T> void onWeakChangeAndOperate(ObservableValue<T> value, Consumer<T> consumer) {
-        onWeakChange(value, consumer);
+    public static <T> WeakChangeListener<T> onWeakChangeAndOperate(ObservableValue<T> value, Consumer<T> consumer) {
         consumer.accept(value.getValue());
+        return onWeakChange(value, consumer);
+    }
+
+    public static void runLaterIf(BooleanSupplier condition, Runnable runnable) {
+        if (condition.getAsBoolean()) Platform.runLater(() -> runLaterIf(condition, runnable));
+        else runnable.run();
     }
 
     public static void limitSize(ImageView imageView, double maxWidth, double maxHeight) {
@@ -140,6 +162,20 @@ public final class FXUtils {
                 });
     }
 
+    public static <K, T> void setupCellValueFactory(JFXTreeTableColumn<K, T> column, Function<K, ObservableValue<T>> mapper) {
+        column.setCellValueFactory(param -> {
+            if (column.validateValue(param))
+                return mapper.apply(param.getValue().getValue());
+            else
+                return column.getComputedValue(param);
+        });
+    }
+
+    public static Node wrapMargin(Node node, Insets insets) {
+        StackPane.setMargin(node, insets);
+        return new StackPane(node);
+    }
+
     public static void setValidateWhileTextChanged(Node field, boolean validate) {
         if (field instanceof JFXTextField) {
             if (validate) {
@@ -163,19 +199,19 @@ public final class FXUtils {
         return field.getProperties().containsKey("FXUtils.validation");
     }
 
-    public static void setOverflowHidden(Region region, boolean hidden) {
-        if (hidden) {
-            Rectangle rectangle = new Rectangle();
-            rectangle.widthProperty().bind(region.widthProperty());
-            rectangle.heightProperty().bind(region.heightProperty());
-            region.setClip(rectangle);
-        } else {
-            region.setClip(null);
-        }
+    public static Rectangle setOverflowHidden(Region region) {
+        Rectangle rectangle = new Rectangle();
+        rectangle.widthProperty().bind(region.widthProperty());
+        rectangle.heightProperty().bind(region.heightProperty());
+        region.setClip(rectangle);
+        return rectangle;
     }
 
-    public static boolean getOverflowHidden(Region region) {
-        return region.getClip() != null;
+    public static Rectangle setOverflowHidden(Region region, double arc) {
+        Rectangle rectangle = setOverflowHidden(region);
+        rectangle.setArcWidth(arc);
+        rectangle.setArcHeight(arc);
+        return rectangle;
     }
 
     public static void setLimitWidth(Region region, double width) {
@@ -198,6 +234,14 @@ public final class FXUtils {
         return region.getMaxHeight();
     }
 
+    public static Node limitingSize(Node node, double width, double height) {
+        StackPane pane = new StackPane(node);
+        pane.setAlignment(Pos.CENTER);
+        FXUtils.setLimitWidth(pane, width);
+        FXUtils.setLimitHeight(pane, height);
+        return pane;
+    }
+
     public static void smoothScrolling(ScrollPane scrollPane) {
         JFXScrollPane.smoothScrolling(scrollPane);
     }
@@ -206,34 +250,73 @@ public final class FXUtils {
         FXMLLoader loader = new FXMLLoader(node.getClass().getResource(absolutePath), I18n.getResourceBundle());
         loader.setRoot(node);
         loader.setController(node);
-        Lang.invoke((ExceptionalSupplier<Object, IOException>) loader::load);
+        try {
+            loader.load();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
-    public static void installTooltip(Node node, String tooltip) {
-        installTooltip(node, 0, 5000, 0, new Tooltip(tooltip));
+    public static void installFastTooltip(Node node, Tooltip tooltip) {
+        installTooltip(node, 50, 5000, 0, tooltip);
+    }
+
+    public static void installFastTooltip(Node node, String tooltip) {
+        installFastTooltip(node, new Tooltip(tooltip));
+    }
+
+    public static void installSlowTooltip(Node node, Tooltip tooltip) {
+        installTooltip(node, 500, 5000, 0, tooltip);
+    }
+
+    public static void installSlowTooltip(Node node, String tooltip) {
+        installSlowTooltip(node, new Tooltip(tooltip));
     }
 
     public static void installTooltip(Node node, double openDelay, double visibleDelay, double closeDelay, Tooltip tooltip) {
-        try {
-            // Java 8
-            Class<?> behaviorClass = Class.forName("javafx.scene.control.Tooltip$TooltipBehavior");
-            Constructor<?> behaviorConstructor = behaviorClass.getDeclaredConstructor(Duration.class, Duration.class, Duration.class, boolean.class);
-            behaviorConstructor.setAccessible(true);
-            Object behavior = behaviorConstructor.newInstance(new Duration(openDelay), new Duration(visibleDelay), new Duration(closeDelay), false);
-            Method installMethod = behaviorClass.getDeclaredMethod("install", Node.class, Tooltip.class);
-            installMethod.setAccessible(true);
-            installMethod.invoke(behavior, node, tooltip);
-        } catch (ReflectiveOperationException e) {
+        runInFX(() -> {
             try {
-                // Java 9
-                Tooltip.class.getMethod("setShowDelay", Duration.class).invoke(tooltip, new Duration(openDelay));
-                Tooltip.class.getMethod("setShowDuration", Duration.class).invoke(tooltip, new Duration(visibleDelay));
-                Tooltip.class.getMethod("setHideDelay", Duration.class).invoke(tooltip, new Duration(closeDelay));
-            } catch (ReflectiveOperationException e2) {
-                e.addSuppressed(e2);
-                Logging.LOG.log(Level.SEVERE, "Cannot install tooltip", e);
+                // Java 8
+                Class<?> behaviorClass = Class.forName("javafx.scene.control.Tooltip$TooltipBehavior");
+                Constructor<?> behaviorConstructor = behaviorClass.getDeclaredConstructor(Duration.class, Duration.class, Duration.class, boolean.class);
+                behaviorConstructor.setAccessible(true);
+                Object behavior = behaviorConstructor.newInstance(new Duration(openDelay), new Duration(visibleDelay), new Duration(closeDelay), false);
+                Method installMethod = behaviorClass.getDeclaredMethod("install", Node.class, Tooltip.class);
+                installMethod.setAccessible(true);
+                installMethod.invoke(behavior, node, tooltip);
+            } catch (ReflectiveOperationException e) {
+                try {
+                    // Java 9
+                    Tooltip.class.getMethod("setShowDelay", Duration.class).invoke(tooltip, new Duration(openDelay));
+                    Tooltip.class.getMethod("setShowDuration", Duration.class).invoke(tooltip, new Duration(visibleDelay));
+                    Tooltip.class.getMethod("setHideDelay", Duration.class).invoke(tooltip, new Duration(closeDelay));
+                } catch (ReflectiveOperationException e2) {
+                    e.addSuppressed(e2);
+                    Logging.LOG.log(Level.SEVERE, "Cannot install tooltip", e);
+                }
+                Tooltip.install(node, tooltip);
             }
-            Tooltip.install(node, tooltip);
+        });
+    }
+
+    public static void playAnimation(Node node, String animationKey, Timeline timeline) {
+        animationKey = "FXUTILS.ANIMATION." + animationKey;
+        Object oldTimeline = node.getProperties().get(animationKey);
+        if (oldTimeline instanceof Timeline) ((Timeline) oldTimeline).stop();
+        if (timeline != null) timeline.play();
+        node.getProperties().put(animationKey, timeline);
+    }
+
+    public static <T> void playAnimation(Node node, String animationKey, Duration duration, WritableValue<T> property, T from, T to, Interpolator interpolator) {
+        if (from == null) from = property.getValue();
+        if (duration == null || Objects.equals(duration, Duration.ZERO) || Objects.equals(from, to)) {
+            playAnimation(node, animationKey, null);
+            property.setValue(to);
+        } else {
+            playAnimation(node, animationKey, new Timeline(
+                    new KeyFrame(Duration.ZERO, new KeyValue(property, from, interpolator)),
+                    new KeyFrame(duration, new KeyValue(property, to, interpolator))
+            ));
         }
     }
 
@@ -254,11 +337,15 @@ public final class FXUtils {
                 }
                 break;
             default:
-                try {
-                    java.awt.Desktop.getDesktop().open(file);
-                } catch (Throwable e) {
-                    Logging.LOG.log(Level.SEVERE, "Unable to open " + path + " by java.awt.Desktop.getDesktop()::open", e);
-                }
+                thread(() -> {
+                    if (java.awt.Desktop.isDesktopSupported()) {
+                        try {
+                            java.awt.Desktop.getDesktop().open(file);
+                        } catch (Throwable e) {
+                            Logging.LOG.log(Level.SEVERE, "Unable to open " + path + " by java.awt.Desktop.getDesktop()::open", e);
+                        }
+                    }
+                });
         }
     }
 
@@ -270,21 +357,25 @@ public final class FXUtils {
     public static void openLink(String link) {
         if (link == null)
             return;
-        try {
-            java.awt.Desktop.getDesktop().browse(new URI(link));
-        } catch (Throwable e) {
-            if (OperatingSystem.CURRENT_OS == OperatingSystem.OSX)
+        thread(() -> {
+            if (java.awt.Desktop.isDesktopSupported()) {
                 try {
-                    Runtime.getRuntime().exec(new String[] { "/usr/bin/open", link });
-                } catch (IOException ex) {
-                    Logging.LOG.log(Level.WARNING, "Unable to open link: " + link, ex);
+                    java.awt.Desktop.getDesktop().browse(new URI(link));
+                } catch (Throwable e) {
+                    if (OperatingSystem.CURRENT_OS == OperatingSystem.OSX)
+                        try {
+                            Runtime.getRuntime().exec(new String[]{"/usr/bin/open", link});
+                        } catch (IOException ex) {
+                            Logging.LOG.log(Level.WARNING, "Unable to open link: " + link, ex);
+                        }
+                    Logging.LOG.log(Level.WARNING, "Failed to open link: " + link, e);
                 }
-            Logging.LOG.log(Level.WARNING, "Failed to open link: " + link, e);
-        }
+            }
+        });
     }
 
     public static void bindInt(JFXTextField textField, Property<Number> property) {
-        textField.textProperty().bindBidirectional(property, SafeIntStringConverter.INSTANCE);
+        textField.textProperty().bindBidirectional(property, SafeStringConverter.fromInteger());
     }
 
     public static void unbindInt(JFXTextField textField, Property<Number> property) {
@@ -321,9 +412,11 @@ public final class FXUtils {
      * @param comboBox the combo box being bound with {@code property}.
      * @param property the property being bound with {@code combo box}.
      * @see #unbindEnum(JFXComboBox)
+     * @deprecated Use {@link ExtendedProperties#selectedItemPropertyFor(ComboBox)}
      */
     @SuppressWarnings("unchecked")
-    public static void bindEnum(JFXComboBox<?> comboBox, Property<? extends Enum> property) {
+    @Deprecated
+    public static void bindEnum(JFXComboBox<?> comboBox, Property<? extends Enum<?>> property) {
         unbindEnum(comboBox);
         ChangeListener<Number> listener = (a, b, newValue) ->
                 ((Property) property).setValue(property.getValue().getClass().getEnumConstants()[newValue.intValue()]);
@@ -337,78 +430,57 @@ public final class FXUtils {
      * You should <b>only and always</b> use {@code bindEnum} as well as {@code unbindEnum} at the same time.
      * @param comboBox the combo box being bound with the property which can be inferred by {@code bindEnum}.
      * @see #bindEnum(JFXComboBox, Property)
+     * @deprecated Use {@link ExtendedProperties#selectedItemPropertyFor(ComboBox)}
      */
     @SuppressWarnings("unchecked")
+    @Deprecated
     public static void unbindEnum(JFXComboBox<?> comboBox) {
         ChangeListener listener = tryCast(comboBox.getProperties().get("FXUtils.bindEnum.listener"), ChangeListener.class).orElse(null);
         if (listener == null) return;
         comboBox.getSelectionModel().selectedIndexProperty().removeListener(listener);
     }
 
-    public static void smoothScrolling(ListView<?> listView) {
-        listView.skinProperty().addListener(o -> {
-            ScrollBar bar = (ScrollBar) listView.lookup(".scroll-bar");
-            Node virtualFlow = listView.lookup(".virtual-flow");
-            double[] frictions = new double[]{0.99, 0.1, 0.05, 0.04, 0.03, 0.02, 0.01, 0.04, 0.01, 0.008, 0.008, 0.008, 0.008, 0.0006, 0.0005, 0.00003, 0.00001};
-            double[] pushes = new double[]{1};
-            double[] derivatives = new double[frictions.length];
-
-            Timeline timeline = new Timeline();
-            bar.addEventHandler(MouseEvent.DRAG_DETECTED, e -> timeline.stop());
-
-            EventHandler<ScrollEvent> scrollEventHandler = event -> {
-                if (event.getEventType() == ScrollEvent.SCROLL) {
-                    int direction = event.getDeltaY() > 0 ? -1 : 1;
-                    for (int i = 0; i < pushes.length; ++i)
-                        derivatives[i] += direction * pushes[i];
-                    if (timeline.getStatus() == Animation.Status.STOPPED)
-                        timeline.play();
-                    event.consume();
-                }
-            };
-
-            bar.addEventHandler(ScrollEvent.ANY, scrollEventHandler);
-            virtualFlow.setOnScroll(scrollEventHandler);
-
-            timeline.getKeyFrames().add(new KeyFrame(Duration.millis(3), event -> {
-                for (int i = 0; i < derivatives.length; ++i)
-                    derivatives[i] *= frictions[i];
-                for (int i = 1; i < derivatives.length; ++i)
-                    derivatives[i] += derivatives[i - 1];
-                double dy = derivatives[derivatives.length - 1];
-                double height = listView.getLayoutBounds().getHeight();
-                bar.setValue(Math.min(Math.max(bar.getValue() + dy / height, 0), 1));
-                if (Math.abs(dy) < 0.001)
-                    timeline.stop();
-                listView.requestLayout();
-            }));
-            timeline.setCycleCount(Animation.INDEFINITE);
-        });
+    /**
+     * Suppress IllegalArgumentException since the url is supposed to be correct definitely.
+     * @param url the url of image. The image resource should be a file within the jar.
+     * @return the image resource within the jar.
+     * @see org.jackhuang.hmcl.util.CrashReporter
+     * @see ResourceNotFoundError
+     */
+    public static Image newImage(String url) {
+        try {
+            return new Image(url);
+        } catch (IllegalArgumentException e) {
+            throw new ResourceNotFoundError("Cannot access image: " + url, e);
+        }
     }
 
-    public static <T> T runInUIThread(Supplier<T> supplier) {
-        if (javafx.application.Platform.isFxApplicationThread()) {
-            return supplier.get();
-        } else {
-            CountDownLatch doneLatch = new CountDownLatch(1);
-            AtomicReference<T> reference = new AtomicReference<>();
-            Platform.runLater(() -> {
-                try {
-                    reference.set(supplier.get());
-                } finally {
-                    doneLatch.countDown();
-                }
+    public static void applyDragListener(Node node, FileFilter filter, Consumer<List<File>> callback) {
+        applyDragListener(node, filter, callback, null);
+    }
 
-            });
-
-            try {
-                doneLatch.await();
-            } catch (InterruptedException var3) {
-                Thread.currentThread().interrupt();
+    public static void applyDragListener(Node node, FileFilter filter, Consumer<List<File>> callback, Runnable dragDropped) {
+        node.setOnDragOver(event -> {
+            if (event.getGestureSource() != node && event.getDragboard().hasFiles()) {
+                if (event.getDragboard().getFiles().stream().anyMatch(filter::accept))
+                    event.acceptTransferModes(TransferMode.COPY_OR_MOVE);
             }
+            event.consume();
+        });
 
-            return reference.get();
-        }
+        node.setOnDragDropped(event -> {
+            List<File> files = event.getDragboard().getFiles();
+            if (files != null) {
+                List<File> acceptFiles = files.stream().filter(filter::accept).collect(Collectors.toList());
+                if (!acceptFiles.isEmpty()) {
+                    callback.accept(acceptFiles);
+                    event.setDropCompleted(true);
+                }
+            }
+            if (dragDropped != null)
+                dragDropped.run();
+            event.consume();
+        });
     }
 
     public static <T> StringConverter<T> stringConverter(Function<T, String> func) {
@@ -432,6 +504,7 @@ public final class FXUtils {
             public void updateItem(T item, boolean empty) {
                 super.updateItem(item, empty);
                 if (!empty) {
+                    setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
                     setGraphic(graphicBuilder.apply(item));
                 }
             }
@@ -449,4 +522,11 @@ public final class FXUtils {
             return "Interpolator.SINE";
         }
     };
+
+    public static Runnable withJFXPopupClosing(Runnable runnable, JFXPopup popup) {
+        return () -> {
+            runnable.run();
+            popup.hide();
+        };
+    }
 }

@@ -1,6 +1,6 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -13,7 +13,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.ui.construct;
 
@@ -42,7 +42,7 @@ public class AdvancedListBox extends ScrollPane {
     }
 
     public AdvancedListBox add(Node child) {
-        if (child instanceof Pane)
+        if (child instanceof Pane || child instanceof AdvancedListItem)
             container.getChildren().add(child);
         else {
             StackPane pane = new StackPane();
@@ -53,22 +53,37 @@ public class AdvancedListBox extends ScrollPane {
         return this;
     }
 
-    public AdvancedListBox remove(Node child) {
-        if (child instanceof Pane)
-            container.getChildren().remove(child);
+    public AdvancedListBox add(int index, Node child) {
+        if (child instanceof Pane || child instanceof AdvancedListItem)
+            container.getChildren().add(index, child);
         else {
-            StackPane pane = null;
-            for (Node node : container.getChildren())
+            StackPane pane = new StackPane();
+            pane.getStyleClass().add("advanced-list-box-item");
+            pane.getChildren().setAll(child);
+            container.getChildren().add(index, pane);
+        }
+        return this;
+    }
+
+    public AdvancedListBox remove(Node child) {
+        container.getChildren().remove(indexOf(child));
+        return this;
+    }
+
+    public int indexOf(Node child) {
+        if (child instanceof Pane) {
+            return container.getChildren().indexOf(child);
+        } else {
+            for (int i = 0; i < container.getChildren().size(); ++i) {
+                Node node = container.getChildren().get(i);
                 if (node instanceof StackPane) {
                     ObservableList<Node> list = ((StackPane) node).getChildren();
                     if (list.size() == 1 && list.get(0) == child)
-                        pane = (StackPane) node;
+                        return i;
                 }
-            if (pane == null)
-                throw new Error();
-            container.getChildren().remove(pane);
+            }
+            return -1;
         }
-        return this;
     }
 
     public AdvancedListBox startCategory(String category) {

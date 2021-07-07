@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,7 +13,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.auth.offline;
 
@@ -22,13 +22,13 @@ import org.jackhuang.hmcl.auth.AuthInfo;
 import org.jackhuang.hmcl.auth.AuthenticationException;
 import org.jackhuang.hmcl.util.StringUtils;
 import org.jackhuang.hmcl.util.ToStringBuilder;
-import org.jackhuang.hmcl.util.UUIDTypeAdapter;
+import org.jackhuang.hmcl.util.gson.UUIDTypeAdapter;
 
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
+import static java.util.Objects.requireNonNull;
 import static org.jackhuang.hmcl.util.Lang.mapOf;
 import static org.jackhuang.hmcl.util.Pair.pair;
 
@@ -41,15 +41,13 @@ public class OfflineAccount extends Account {
     private final String username;
     private final UUID uuid;
 
-    OfflineAccount(String username, UUID uuid) {
-        Objects.requireNonNull(username);
-        Objects.requireNonNull(uuid);
+    protected OfflineAccount(String username, UUID uuid) {
+        this.username = requireNonNull(username);
+        this.uuid = requireNonNull(uuid);
 
-        this.username = username;
-        this.uuid = uuid;
-
-        if (StringUtils.isBlank(username))
+        if (StringUtils.isBlank(username)) {
             throw new IllegalArgumentException("Username cannot be blank");
+        }
     }
 
     @Override
@@ -68,10 +66,7 @@ public class OfflineAccount extends Account {
     }
 
     @Override
-    public AuthInfo logIn() throws AuthenticationException {
-        if (StringUtils.isBlank(username))
-            throw new AuthenticationException("Username cannot be empty");
-
+    public AuthInfo logIn() {
         return new AuthInfo(username, uuid, UUIDTypeAdapter.fromUUID(UUID.randomUUID()), "{}");
     }
 
@@ -82,7 +77,7 @@ public class OfflineAccount extends Account {
 
     @Override
     public Optional<AuthInfo> playOffline() {
-        return Optional.empty();
+        return Optional.of(logIn());
     }
 
     @Override
@@ -91,11 +86,6 @@ public class OfflineAccount extends Account {
                 pair("uuid", UUIDTypeAdapter.fromUUID(uuid)),
                 pair("username", username)
         );
-    }
-
-    @Override
-    public void clearCache() {
-        // Nothing to clear.
     }
 
     @Override

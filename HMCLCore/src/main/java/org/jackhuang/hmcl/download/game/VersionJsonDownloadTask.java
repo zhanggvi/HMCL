@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,7 +13,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.download.game;
 
@@ -22,8 +22,8 @@ import org.jackhuang.hmcl.download.RemoteVersion;
 import org.jackhuang.hmcl.download.VersionList;
 import org.jackhuang.hmcl.task.GetTask;
 import org.jackhuang.hmcl.task.Task;
-import org.jackhuang.hmcl.util.NetworkUtils;
 
+import java.io.IOException;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
@@ -32,41 +32,37 @@ import java.util.List;
  *
  * @author huangyuhui
  */
-public final class VersionJsonDownloadTask extends Task {
+public final class VersionJsonDownloadTask extends Task<String> {
     private final String gameVersion;
     private final DefaultDependencyManager dependencyManager;
-    private final List<Task> dependents = new LinkedList<>();
-    private final List<Task> dependencies = new LinkedList<>();
+    private final List<Task<?>> dependents = new LinkedList<>();
+    private final List<Task<?>> dependencies = new LinkedList<>();
     private final VersionList<?> gameVersionList;
 
     public VersionJsonDownloadTask(String gameVersion, DefaultDependencyManager dependencyManager) {
         this.gameVersion = gameVersion;
         this.dependencyManager = dependencyManager;
         this.gameVersionList = dependencyManager.getVersionList("game");
-        
-        if (!gameVersionList.isLoaded())
-            dependents.add(gameVersionList.refreshAsync(dependencyManager.getDownloadProvider()));
+
+        dependents.add(gameVersionList.loadAsync());
 
         setSignificance(TaskSignificance.MODERATE);
     }
 
     @Override
-    public Collection<Task> getDependencies() {
+    public Collection<Task<?>> getDependencies() {
         return dependencies;
     }
 
     @Override
-    public Collection<Task> getDependents() {
+    public Collection<Task<?>> getDependents() {
         return dependents;
     }
 
     @Override
-    public void execute() {
-        RemoteVersion<?> remoteVersion = gameVersionList.getVersions(gameVersion).stream().findFirst()
-                .orElseThrow(() -> new IllegalStateException("Cannot find specific version " + gameVersion + " in remote repository"));
-        String jsonURL = dependencyManager.getDownloadProvider().injectURL(remoteVersion.getUrl());
-        dependencies.add(new GetTask(NetworkUtils.toURL(jsonURL), ID));
+    public void execute() throws IOException {
+        RemoteVersion remoteVersion = gameVersionList.getVersion(gameVersion, gameVersion)
+                .orElseThrow(() -> new IOException("Cannot find specific version " + gameVersion + " in remote repository"));
+        dependencies.add(new GetTask(dependencyManager.getDownloadProvider().injectURLsWithCandidates(remoteVersion.getUrls())).storeTo(this::setResult));
     }
-    
-    public static final String ID = "raw_version_json";
 }

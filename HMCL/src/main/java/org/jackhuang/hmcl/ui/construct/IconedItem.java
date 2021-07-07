@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,40 +13,46 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.ui.construct;
 
-import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
-import javafx.scene.paint.Paint;
 
 public class IconedItem extends RipplerContainer {
 
+    private Label label;
+
     public IconedItem(Node icon, String text) {
-        super(createHBox(icon, text));
+        this(icon);
+        label.setText(text);
     }
 
-    private static HBox createHBox(Node icon, String text) {
+    public IconedItem(Node icon) {
+        super(createHBox(icon));
+        label = ((Label) lookup("#label"));
+        getStyleClass().setAll("iconed-item");
+    }
+
+    private static HBox createHBox(Node icon) {
         HBox hBox = new HBox();
-        icon.setMouseTransparent(true);
-        Label textLabel = new Label(text);
+
+        if (icon != null) {
+            icon.setMouseTransparent(true);
+            hBox.getChildren().add(icon);
+        }
+
+        hBox.getStyleClass().add("iconed-item-container");
+        Label textLabel = new Label();
         textLabel.setId("label");
-        textLabel.setAlignment(Pos.CENTER);
         textLabel.setMouseTransparent(true);
-        hBox.getChildren().addAll(icon, textLabel);
-        hBox.setStyle("-fx-padding: 10 16 10 16; -fx-spacing: 10; -fx-font-size: 14;");
-        hBox.setAlignment(Pos.CENTER_LEFT);
+        hBox.getChildren().addAll(textLabel);
         return hBox;
     }
 
-    public void setText(String text) {
-        ((Label) lookup("#label")).setText(text);
-    }
-
-    public void setTextFill(Paint paint) {
-        ((Label) lookup("#label")).setTextFill(paint);
+    public Label getLabel() {
+        return label;
     }
 }

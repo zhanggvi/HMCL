@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,17 +13,44 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.launch;
 
 import org.jackhuang.hmcl.auth.AuthInfo;
-import org.jackhuang.hmcl.game.*;
-import org.jackhuang.hmcl.util.*;
+import org.jackhuang.hmcl.game.Argument;
+import org.jackhuang.hmcl.game.Arguments;
+import org.jackhuang.hmcl.game.GameRepository;
+import org.jackhuang.hmcl.game.LaunchOptions;
+import org.jackhuang.hmcl.game.Library;
+import org.jackhuang.hmcl.game.NativesDirectoryType;
+import org.jackhuang.hmcl.game.Version;
+import org.jackhuang.hmcl.util.Lang;
+import org.jackhuang.hmcl.util.Log4jLevel;
+import org.jackhuang.hmcl.util.StringUtils;
+import org.jackhuang.hmcl.util.gson.UUIDTypeAdapter;
+import org.jackhuang.hmcl.util.io.FileUtils;
+import org.jackhuang.hmcl.util.io.Unzipper;
+import org.jackhuang.hmcl.util.platform.CommandBuilder;
+import org.jackhuang.hmcl.util.platform.JavaVersion;
+import org.jackhuang.hmcl.util.platform.ManagedProcess;
+import org.jackhuang.hmcl.util.platform.OperatingSystem;
+import org.jackhuang.hmcl.util.platform.Platform;
 
-import java.io.*;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
 import java.nio.file.Files;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.function.Supplier;
 
 import static org.jackhuang.hmcl.util.Lang.mapOf;
@@ -35,19 +62,19 @@ import static org.jackhuang.hmcl.util.Pair.pair;
  */
 public class DefaultLauncher extends Launcher {
 
-    public DefaultLauncher(GameRepository repository, String versionId, AuthInfo authInfo, LaunchOptions options) {
-        this(repository, versionId, authInfo, options, null);
+    public DefaultLauncher(GameRepository repository, Version version, AuthInfo authInfo, LaunchOptions options) {
+        this(repository, version, authInfo, options, null);
     }
 
-    public DefaultLauncher(GameRepository repository, String versionId, AuthInfo authInfo, LaunchOptions options, ProcessListener listener) {
-        this(repository, versionId, authInfo, options, listener, true);
+    public DefaultLauncher(GameRepository repository, Version version, AuthInfo authInfo, LaunchOptions options, ProcessListener listener) {
+        this(repository, version, authInfo, options, listener, true);
     }
 
-    public DefaultLauncher(GameRepository repository, String versionId, AuthInfo authInfo, LaunchOptions options, ProcessListener listener, boolean daemon) {
-        super(repository, versionId, authInfo, options, listener, daemon);
+    public DefaultLauncher(GameRepository repository, Version version, AuthInfo authInfo, LaunchOptions options, ProcessListener listener, boolean daemon) {
+        super(repository, version, authInfo, options, listener, daemon);
     }
 
-    private CommandBuilder generateCommandLine(File nativeFolder, boolean enableLoggingInfo) throws IOException {
+    private CommandBuilder generateCommandLine(File nativeFolder) throws IOException {
         CommandBuilder res = new CommandBuilder();
 
         // Executable
@@ -56,8 +83,7 @@ public class DefaultLauncher extends Launcher {
 
         res.add(options.getJava().getBinary().toString());
 
-        if (StringUtils.isNotBlank(options.getJavaArgs()))
-            res.addAllWithoutParsing(StringUtils.tokenize(options.getJavaArgs()));
+        res.addAllWithoutParsing(options.getJavaArguments());
 
         // JVM Args
         if (!options.isNoGeneratedJVMArgs()) {
@@ -70,21 +96,11 @@ public class DefaultLauncher extends Launcher {
                 res.add("-Xdock:icon=" + repository.getAssetObject(version.getId(), version.getAssetIndex().getId(), "icons/minecraft.icns").getAbsolutePath());
             }
 
-            Map<DownloadType, LoggingInfo> logging = version.getLogging();
-            if (logging != null && enableLoggingInfo) {
-                LoggingInfo loggingInfo = logging.get(DownloadType.CLIENT);
-                if (loggingInfo != null) {
-                    File loggingFile = repository.getLoggingObject(version.getId(), version.getAssetIndex().getId(), loggingInfo);
-                    if (loggingFile.exists())
-                        res.add(loggingInfo.getArgument().replace("${path}", loggingFile.getAbsolutePath()));
-                }
-            }
-
             if (OperatingSystem.CURRENT_OS != OperatingSystem.WINDOWS)
                 res.add("-Duser.home=" + options.getGameDir().getParent());
 
             // Force using G1GC with its settings
-            if (options.getJava().getParsedVersion() >= JavaVersion.JAVA_7) {
+            if (options.getJava().getParsedVersion() >= JavaVersion.JAVA_8) {
                 res.add("-XX:+UnlockExperimentalVMOptions");
                 res.add("-XX:+UseG1GC");
                 res.add("-XX:G1NewSizePercent=20");
@@ -115,8 +131,29 @@ public class DefaultLauncher extends Launcher {
             if (options.getMinMemory() != null && options.getMinMemory() > 0)
                 res.add("-Xms" + options.getMinMemory() + "m");
 
+            if (options.getJava().getParsedVersion() == JavaVersion.JAVA_16)
+                res.add("--illegal-access=permit");
+
             res.add("-Dfml.ignoreInvalidMinecraftCertificates=true");
             res.add("-Dfml.ignorePatchDiscrepancies=true");
+        }
+
+        Proxy proxy = options.getProxy();
+        if (proxy != null && StringUtils.isBlank(options.getProxyUser()) && StringUtils.isBlank(options.getProxyPass())) {
+            InetSocketAddress address = (InetSocketAddress) options.getProxy().address();
+            if (address != null) {
+                String host = address.getHostString();
+                int port = address.getPort();
+                if (proxy.type() == Proxy.Type.HTTP) {
+                    res.add("-Dhttp.proxyHost=" + host);
+                    res.add("-Dhttp.proxyPort=" + port);
+                    res.add("-Dhttps.proxyHost=" + host);
+                    res.add("-Dhttps.proxyPort=" + port);
+                } else if (proxy.type() == Proxy.Type.SOCKS) {
+                    res.add("-DsocksProxyHost=" + host);
+                    res.add("-DsocksProxyPort=" + port);
+                }
+            }
         }
 
         LinkedList<String> classpath = new LinkedList<>();
@@ -139,6 +176,7 @@ public class DefaultLauncher extends Launcher {
         configuration.put("${natives_directory}", nativeFolder.getAbsolutePath());
         configuration.put("${game_assets}", gameAssets.getAbsolutePath());
         configuration.put("${assets_root}", gameAssets.getAbsolutePath());
+        configuration.put("${libraries_directory}", repository.getLibrariesDirectory(version).getAbsolutePath());
 
         res.addAll(Arguments.parseArguments(version.getArguments().map(Arguments::getJvm).orElseGet(this::getDefaultJVMArguments), configuration));
         if (authInfo.getArguments() != null && authInfo.getArguments().getJvm() != null && !authInfo.getArguments().getJvm().isEmpty())
@@ -146,20 +184,15 @@ public class DefaultLauncher extends Launcher {
 
         res.add(version.getMainClass());
 
-        Map<String, Boolean> features = getFeatures();
-        res.addAll(Arguments.parseArguments(version.getArguments().map(Arguments::getGame).orElseGet(this::getDefaultGameArguments), configuration, features));
-        if (authInfo.getArguments() != null && authInfo.getArguments().getGame() != null && !authInfo.getArguments().getGame().isEmpty())
-            res.addAll(Arguments.parseArguments(authInfo.getArguments().getGame(), configuration, features));
-
         res.addAll(Arguments.parseStringArguments(version.getMinecraftArguments().map(StringUtils::tokenize).orElseGet(LinkedList::new), configuration));
 
-        // Optional Minecraft arguments
-        if (options.getHeight() != null && options.getHeight() != 0 && options.getWidth() != null && options.getWidth() != 0) {
-            res.add("--height");
-            res.add(options.getHeight().toString());
-            res.add("--width");
-            res.add(options.getWidth().toString());
+        Map<String, Boolean> features = getFeatures();
+        version.getArguments().map(Arguments::getGame).ifPresent(arguments -> res.addAll(Arguments.parseArguments(arguments, configuration, features)));
+        if (version.getMinecraftArguments().isPresent()) {
+            res.addAll(Arguments.parseArguments(this.getDefaultGameArguments(), configuration, features));
         }
+        if (authInfo.getArguments() != null && authInfo.getArguments().getGame() != null && !authInfo.getArguments().getGame().isEmpty())
+            res.addAll(Arguments.parseArguments(authInfo.getArguments().getGame(), configuration, features));
 
         if (StringUtils.isNotBlank(options.getServerIp())) {
             String[] args = options.getServerIp().split(":");
@@ -172,21 +205,23 @@ public class DefaultLauncher extends Launcher {
         if (options.isFullscreen())
             res.add("--fullscreen");
 
-        if (StringUtils.isNotBlank(options.getProxyHost()) && StringUtils.isNotBlank(options.getProxyPort())) {
-            res.add("--proxyHost");
-            res.add(options.getProxyHost());
-            res.add("--proxyPort");
-            res.add(options.getProxyPort());
-            if (StringUtils.isNotBlank(options.getProxyUser()) && StringUtils.isNotBlank(options.getProxyPass())) {
-                res.add("--proxyUser");
-                res.add(options.getProxyUser());
-                res.add("--proxyPass");
-                res.add(options.getProxyPass());
+        if (options.getProxy() != null && options.getProxy().type() == Proxy.Type.SOCKS) {
+            InetSocketAddress address = (InetSocketAddress) options.getProxy().address();
+            if (address != null) {
+                res.add("--proxyHost");
+                res.add(address.getHostString());
+                res.add("--proxyPort");
+                res.add(String.valueOf(address.getPort()));
+                if (StringUtils.isNotBlank(options.getProxyUser()) && StringUtils.isNotBlank(options.getProxyPass())) {
+                    res.add("--proxyUser");
+                    res.add(options.getProxyUser());
+                    res.add("--proxyPass");
+                    res.add(options.getProxyPass());
+                }
             }
         }
 
-        if (StringUtils.isNotBlank(options.getMinecraftArgs()))
-            res.addAllWithoutParsing(StringUtils.tokenize(options.getMinecraftArgs()));
+        res.addAllWithoutParsing(options.getGameArguments());
 
         res.removeIf(it -> getForbiddens().containsKey(it) && getForbiddens().get(it).get());
         return res;
@@ -227,13 +262,19 @@ public class DefaultLauncher extends Launcher {
 
     public void decompressNatives(File destination) throws NotDecompressingNativesException {
         try {
+            FileUtils.cleanDirectoryQuietly(destination);
             for (Library library : version.getLibraries())
                 if (library.isNative())
-                    CompressingUtils.unzip(repository.getLibraryFile(version, library),
-                            destination,
-                            "",
-                            library.getExtract()::shouldExtract,
-                            false);
+                    new Unzipper(repository.getLibraryFile(version, library), destination)
+                            .setFilter((zipEntry, isDirectory, destFile, path) -> {
+                                if (!isDirectory && Files.isRegularFile(destFile) && Files.size(destFile) == Files.size(zipEntry))
+                                    return false;
+                                String ext = FileUtils.getExtension(destFile);
+                                if (ext.equals("sha1") || ext.equals("git"))
+                                    return false;
+                                return library.getExtract().shouldExtract(path);
+                            })
+                            .setReplaceExistentFile(false).unzip();
         } catch (IOException e) {
             throw new NotDecompressingNativesException(e);
         }
@@ -247,33 +288,59 @@ public class DefaultLauncher extends Launcher {
                 pair("${auth_uuid}", UUIDTypeAdapter.fromUUID(authInfo.getUUID())),
                 pair("${version_name}", Optional.ofNullable(options.getVersionName()).orElse(version.getId())),
                 pair("${profile_name}", Optional.ofNullable(options.getProfileName()).orElse("Minecraft")),
-                pair("${version_type}", version.getType().getId()),
+                pair("${version_type}", Optional.ofNullable(options.getVersionType()).orElse(version.getType().getId())),
                 pair("${game_directory}", repository.getRunDirectory(version.getId()).getAbsolutePath()),
                 pair("${user_type}", "mojang"),
                 pair("${assets_index_name}", version.getAssetIndex().getId()),
-                pair("${user_properties}", authInfo.getUserProperties())
+                pair("${user_properties}", authInfo.getUserProperties()),
+                pair("${resolution_width}", options.getWidth().toString()),
+                pair("${resolution_height}", options.getHeight().toString())
         );
     }
 
     @Override
     public ManagedProcess launch() throws IOException, InterruptedException {
-        File nativeFolder = Files.createTempDirectory("minecraft").toFile();
+        File nativeFolder = null;
+        if (options.getNativesDirType() == NativesDirectoryType.VERSION_FOLDER) {
+            nativeFolder = repository.getNativeDirectory(version.getId());
+        } else {
+            nativeFolder = new File(options.getNativesDir());
+        }
 
         // To guarantee that when failed to generate launch command line, we will not call pre-launch command
-        List<String> rawCommandLine = generateCommandLine(nativeFolder, true).asList();
+        List<String> rawCommandLine = generateCommandLine(nativeFolder).asList();
 
-        decompressNatives(nativeFolder);
+        if (rawCommandLine.stream().anyMatch(StringUtils::isBlank)) {
+            throw new IllegalStateException("Illegal command line " + rawCommandLine);
+        }
+
+        if (options.getNativesDirType() == NativesDirectoryType.VERSION_FOLDER) {
+            decompressNatives(nativeFolder);
+        }
 
         File runDirectory = repository.getRunDirectory(version.getId());
 
-        if (StringUtils.isNotBlank(options.getPreLaunchCommand()))
-            new ProcessBuilder(options.getPreLaunchCommand())
+        if (StringUtils.isNotBlank(options.getPreLaunchCommand())) {
+            String versionName = Optional.ofNullable(options.getVersionName()).orElse(version.getId());
+            String preLaunchCommand = options.getPreLaunchCommand()
+                    .replace("$INST_NAME", versionName)
+                    .replace("$INST_ID", versionName)
+                    .replace("$INST_DIR", repository.getVersionRoot(version.getId()).getAbsolutePath())
+                    .replace("$INST_MC_DIR", repository.getRunDirectory(version.getId()).getAbsolutePath())
+                    .replace("$INST_JAVA", options.getJava().getBinary().toString());
+
+            new ProcessBuilder(StringUtils.tokenize(preLaunchCommand))
                     .directory(runDirectory).start().waitFor();
+        }
 
         Process process;
         try {
             ProcessBuilder builder = new ProcessBuilder(rawCommandLine).directory(runDirectory);
-            builder.environment().put("APPDATA", options.getGameDir().getAbsoluteFile().getParent());
+            if (listener == null) {
+                builder.inheritIO();
+            }
+            String appdata = options.getGameDir().getAbsoluteFile().getParent();
+            if (appdata != null) builder.environment().put("APPDATA", appdata);
             process = builder.start();
         } catch (IOException e) {
             throw new ProcessCreationException(e);
@@ -289,8 +356,16 @@ public class DefaultLauncher extends Launcher {
     public void makeLaunchScript(File scriptFile) throws IOException {
         boolean isWindows = OperatingSystem.WINDOWS == OperatingSystem.CURRENT_OS;
 
-        File nativeFolder = repository.getNativeDirectory(versionId);
-        decompressNatives(nativeFolder);
+        File nativeFolder = null;
+        if (options.getNativesDirType() == NativesDirectoryType.VERSION_FOLDER) {
+            nativeFolder = repository.getNativeDirectory(version.getId());
+        } else {
+            nativeFolder = new File(options.getNativesDir());
+        }
+
+        if (options.getNativesDirType() == NativesDirectoryType.VERSION_FOLDER) {
+            decompressNatives(nativeFolder);
+        }
 
         if (isWindows && !FileUtils.getExtension(scriptFile).equals("bat"))
             throw new IllegalArgumentException("The extension of " + scriptFile + " is not 'bat' in Windows");
@@ -312,55 +387,21 @@ public class DefaultLauncher extends Launcher {
                 writer.write(options.getPreLaunchCommand());
                 writer.newLine();
             }
-            writer.write(generateCommandLine(nativeFolder, false).toString());
+            writer.write(generateCommandLine(nativeFolder).toString());
         }
         if (!scriptFile.setExecutable(true))
             throw new PermissionException();
     }
 
-    private void startMonitors(ManagedProcess managedProcess, ProcessListener processListener) {
-        startMonitors(managedProcess, processListener, true);
-    }
-
     private void startMonitors(ManagedProcess managedProcess, ProcessListener processListener, boolean isDaemon) {
-        boolean enablesLoggingInfo = version.getLogging() != null && version.getLogging().containsKey(DownloadType.CLIENT)
-                && !"net.minecraft.launchwrapper.Launch".equals(version.getMainClass());
-        if (enablesLoggingInfo)
-            startMonitorsWithLoggingInfo(managedProcess, processListener, isDaemon);
-        else
-            startMonitorsWithoutLoggingInfo(managedProcess, processListener, isDaemon);
-    }
-
-    private void startMonitorsWithLoggingInfo(ManagedProcess managedProcess, ProcessListener processListener, boolean isDaemon) {
-        processListener.setProcess(managedProcess);
-        Log4jHandler logHandler = new Log4jHandler((line, level) -> {
-            processListener.onLog(line, level);
-            managedProcess.addLine(line);
-        });
-        logHandler.start();
-        managedProcess.addRelatedThread(logHandler);
-        Thread stdout = Lang.thread(new StreamPump(managedProcess.getProcess().getInputStream(), logHandler::newLine), "stdout-pump", isDaemon);
-        managedProcess.addRelatedThread(stdout);
-        Thread stderr = Lang.thread(new StreamPump(managedProcess.getProcess().getErrorStream(), it -> {
-            processListener.onLog(it + OperatingSystem.LINE_SEPARATOR, Log4jLevel.ERROR);
-            managedProcess.addLine(it);
-        }), "stderr-pump", isDaemon);
-        managedProcess.addRelatedThread(stderr);
-        managedProcess.addRelatedThread(Lang.thread(new ExitWaiter(managedProcess, Arrays.asList(stdout, stderr), (exitCode, exitType) -> {
-            logHandler.onStopped();
-            processListener.onExit(exitCode, exitType);
-        }), "exit-waiter", isDaemon));
-    }
-
-    private void startMonitorsWithoutLoggingInfo(ManagedProcess managedProcess, ProcessListener processListener, boolean isDaemon) {
         processListener.setProcess(managedProcess);
         Thread stdout = Lang.thread(new StreamPump(managedProcess.getProcess().getInputStream(), it -> {
-            processListener.onLog(it + OperatingSystem.LINE_SEPARATOR, Optional.ofNullable(Log4jLevel.guessLevel(it)).orElse(Log4jLevel.INFO));
+            processListener.onLog(it, Optional.ofNullable(Log4jLevel.guessLevel(it)).orElse(Log4jLevel.INFO));
             managedProcess.addLine(it);
         }), "stdout-pump", isDaemon);
         managedProcess.addRelatedThread(stdout);
         Thread stderr = Lang.thread(new StreamPump(managedProcess.getProcess().getErrorStream(), it -> {
-            processListener.onLog(it + OperatingSystem.LINE_SEPARATOR, Log4jLevel.ERROR);
+            processListener.onLog(it, Log4jLevel.ERROR);
             managedProcess.addLine(it);
         }), "stderr-pump", isDaemon);
         managedProcess.addRelatedThread(stderr);

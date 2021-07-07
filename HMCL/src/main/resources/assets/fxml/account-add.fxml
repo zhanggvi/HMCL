@@ -4,8 +4,10 @@
 <?import com.jfoenix.validation.RequiredFieldValidator?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
-<?import org.jackhuang.hmcl.ui.FXUtils?>
+<?import javafx.scene.shape.SVGPath?>
+<?import org.jackhuang.hmcl.ui.construct.RequiredValidator?>
 <?import org.jackhuang.hmcl.ui.construct.SpinnerPane?>
+<?import org.jackhuang.hmcl.ui.FXUtils?>
 <fx:root xmlns:fx="http://javafx.com/fxml"
          xmlns="http://javafx.com/javafx"
          type="StackPane">
@@ -29,18 +31,29 @@
                 <Label fx:id="lblInjectorServer" text="%account.injector.server" GridPane.halignment="RIGHT"
                        GridPane.columnIndex="0" GridPane.rowIndex="1"/>
 
-                <JFXComboBox fx:id="cboServers" promptText="%general.prompt.empty" maxHeight="25" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
+                <JFXComboBox fx:id="cboServers" promptText="%account.injector.empty" maxHeight="25" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
 
-                <Hyperlink fx:id="linkManageInjectorServers" text="%account.injector.manage"
-                           onMouseClicked="#onManageInjecterServers" GridPane.columnIndex="2" GridPane.rowIndex="1"/>
+                <HBox GridPane.columnIndex="2" GridPane.rowIndex="1" spacing="8">
+                    <HBox fx:id="linksContainer" alignment="CENTER_LEFT"/>
+                    <JFXButton fx:id="btnAddServer" styleClass="toggle-icon4" onMouseClicked="#onAddInjecterServer">
+                        <graphic>
+                            <javafx.scene.shape.SVGPath content="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z" />
+                        </graphic>
+                    </JFXButton>
+                    <JFXButton fx:id="btnManageServer" styleClass="toggle-icon4" onMouseClicked="#onManageInjecterServers">
+                        <graphic>
+                            <fx:include source="/assets/svg/gear.fxml" />
+                        </graphic>
+                    </JFXButton>
+                </HBox>
 
-                <Label text="%account.username" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
+                <Label fx:id="lblUsername" text="%account.username" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
 
                 <JFXTextField fx:id="txtUsername" GridPane.columnIndex="1" GridPane.rowIndex="2" GridPane.columnSpan="2"
                               FXUtils.validateWhileTextChanged="true" onAction="#onCreationAccept">
                     <validators>
-                        <RequiredFieldValidator message="%input.not_empty">
-                        </RequiredFieldValidator>
+                        <RequiredValidator message="%input.not_empty">
+                        </RequiredValidator>
                     </validators>
                 </JFXTextField>
 
@@ -57,10 +70,12 @@
         </body>
         <actions>
             <Label fx:id="lblCreationWarning"/>
-            <SpinnerPane fx:id="acceptPane" styleClass="small-spinner-pane">
-                <JFXButton fx:id="btnAccept" onMouseClicked="#onCreationAccept" text="%button.ok" styleClass="dialog-accept"/>
-            </SpinnerPane>
-            <JFXButton onMouseClicked="#onCreationCancel" text="%button.cancel" styleClass="dialog-cancel"/>
+            <HBox>
+                <SpinnerPane fx:id="acceptPane" styleClass="small-spinner-pane">
+                    <JFXButton fx:id="btnAccept" onMouseClicked="#onCreationAccept" text="%button.ok" styleClass="dialog-accept"/>
+                </SpinnerPane>
+                <JFXButton onMouseClicked="#onCreationCancel" text="%button.cancel" styleClass="dialog-cancel"/>
+            </HBox>
         </actions>
     </JFXDialogLayout>
 </fx:root>

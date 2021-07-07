@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,81 +13,69 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.download.game;
 
-import com.google.gson.JsonParseException;
-import com.google.gson.annotations.SerializedName;
+import org.jackhuang.hmcl.download.DefaultDependencyManager;
+import org.jackhuang.hmcl.download.LibraryAnalyzer;
+import org.jackhuang.hmcl.download.RemoteVersion;
 import org.jackhuang.hmcl.game.ReleaseType;
-import org.jackhuang.hmcl.util.Constants;
-import org.jackhuang.hmcl.util.StringUtils;
-import org.jackhuang.hmcl.util.Validation;
+import org.jackhuang.hmcl.game.Version;
+import org.jackhuang.hmcl.task.Task;
+import org.jackhuang.hmcl.util.Immutable;
 
 import java.util.Date;
+import java.util.List;
 
 /**
  *
  * @author huangyuhui
  */
-public final class GameRemoteVersion implements Validation {
+@Immutable
+public final class GameRemoteVersion extends RemoteVersion {
 
-    @SerializedName("id")
-    private final String gameVersion;
-
-    @SerializedName("time")
+    private final ReleaseType type;
     private final Date time;
 
-    @SerializedName("releaseTime")
-    private final Date releaseTime;
-
-    @SerializedName("type")
-    private final ReleaseType type;
-
-    @SerializedName("url")
-    private final String url;
-
-    public GameRemoteVersion() {
-        this("", new Date(), new Date(), ReleaseType.UNKNOWN);
-    }
-
-    public GameRemoteVersion(String gameVersion, Date time, Date releaseTime, ReleaseType type) {
-        this(gameVersion, time, releaseTime, type, Constants.DEFAULT_LIBRARY_URL + gameVersion + "/" + gameVersion + ".json");
-    }
-
-    public GameRemoteVersion(String gameVersion, Date time, Date releaseTime, ReleaseType type, String url) {
-        this.gameVersion = gameVersion;
-        this.time = time;
-        this.releaseTime = releaseTime;
+    public GameRemoteVersion(String gameVersion, String selfVersion, List<String> url, ReleaseType type, Date time) {
+        super(LibraryAnalyzer.LibraryType.MINECRAFT.getPatchId(), gameVersion, selfVersion, getReleaseType(type), url);
         this.type = type;
-        this.url = url;
-    }
-
-    public String getGameVersion() {
-        return gameVersion;
+        this.time = time;
     }
 
     public Date getTime() {
         return time;
     }
 
-    public Date getReleaseTime() {
-        return releaseTime;
-    }
-
     public ReleaseType getType() {
         return type;
     }
 
-    public String getUrl() {
-        return url;
-    }
-    
     @Override
-    public void validate() throws JsonParseException {
-        if (StringUtils.isBlank(gameVersion))
-            throw new JsonParseException("GameRemoteVersion id cannot be blank");
-        if (StringUtils.isBlank(url))
-            throw new JsonParseException("GameRemoteVersion url cannot be blank");
+    public Task<Version> getInstallTask(DefaultDependencyManager dependencyManager, Version baseVersion) {
+        return new GameInstallTask(dependencyManager, baseVersion, this);
+    }
+
+    @Override
+    public int compareTo(RemoteVersion o) {
+        if (!(o instanceof GameRemoteVersion))
+            return 0;
+
+        return ((GameRemoteVersion) o).getTime().compareTo(getTime());
+    }
+
+    private static Type getReleaseType(ReleaseType type) {
+        if (type == null) return Type.UNCATEGORIZED;
+        switch (type) {
+            case RELEASE:
+                return Type.RELEASE;
+            case SNAPSHOT:
+                return Type.SNAPSHOT;
+            case UNKNOWN:
+                return Type.UNCATEGORIZED;
+            default:
+                return Type.OLD;
+        }
     }
 }

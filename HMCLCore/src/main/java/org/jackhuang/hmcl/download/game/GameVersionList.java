@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,17 +13,16 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.download.game;
 
 import org.jackhuang.hmcl.download.DownloadProvider;
-import org.jackhuang.hmcl.download.RemoteVersion;
 import org.jackhuang.hmcl.download.VersionList;
 import org.jackhuang.hmcl.task.GetTask;
 import org.jackhuang.hmcl.task.Task;
-import org.jackhuang.hmcl.util.Constants;
-import org.jackhuang.hmcl.util.NetworkUtils;
+import org.jackhuang.hmcl.util.gson.JsonUtils;
+import org.jackhuang.hmcl.util.io.NetworkUtils;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -32,19 +31,29 @@ import java.util.Collections;
  *
  * @author huangyuhui
  */
-public final class GameVersionList extends VersionList<GameRemoteVersionTag> {
+public final class GameVersionList extends VersionList<GameRemoteVersion> {
+    private final DownloadProvider downloadProvider;
 
-    public static final GameVersionList INSTANCE = new GameVersionList();
-
-    private GameVersionList() {
+    public GameVersionList(DownloadProvider downloadProvider) {
+        this.downloadProvider = downloadProvider;
     }
 
     @Override
-    public Task refreshAsync(DownloadProvider downloadProvider) {
+    public boolean hasType() {
+        return true;
+    }
+
+    @Override
+    protected Collection<GameRemoteVersion> getVersionsImpl(String gameVersion) {
+        return versions.values();
+    }
+
+    @Override
+    public Task<?> refreshAsync() {
         GetTask task = new GetTask(NetworkUtils.toURL(downloadProvider.getVersionListURL()));
-        return new Task() {
+        return new Task<Void>() {
             @Override
-            public Collection<Task> getDependents() {
+            public Collection<Task<?>> getDependents() {
                 return Collections.singleton(task);
             }
 
@@ -55,13 +64,13 @@ public final class GameVersionList extends VersionList<GameRemoteVersionTag> {
                 try {
                     versions.clear();
 
-                    GameRemoteVersions root = Constants.GSON.fromJson(task.getResult(), GameRemoteVersions.class);
-                    for (GameRemoteVersion remoteVersion : root.getVersions()) {
-                        versions.put(remoteVersion.getGameVersion(), new RemoteVersionGame(
+                    GameRemoteVersions root = JsonUtils.GSON.fromJson(task.getResult(), GameRemoteVersions.class);
+                    for (GameRemoteVersionInfo remoteVersion : root.getVersions()) {
+                        versions.put(remoteVersion.getGameVersion(), new GameRemoteVersion(
                                 remoteVersion.getGameVersion(),
                                 remoteVersion.getGameVersion(),
-                                remoteVersion.getUrl(),
-                                new GameRemoteVersionTag(remoteVersion.getType(), remoteVersion.getReleaseTime()))
+                                Collections.singletonList(remoteVersion.getUrl()),
+                                remoteVersion.getType(), remoteVersion.getReleaseTime())
                         );
                     }
                 } finally {
@@ -69,16 +78,5 @@ public final class GameVersionList extends VersionList<GameRemoteVersionTag> {
                 }
             }
         };
-    }
-
-    private static class RemoteVersionGame extends RemoteVersion<GameRemoteVersionTag> {
-        public RemoteVersionGame(String gameVersion, String selfVersion, String url, GameRemoteVersionTag tag) {
-            super(gameVersion, selfVersion, url, tag);
-        }
-
-        @Override
-        public int compareTo(RemoteVersion<GameRemoteVersionTag> o) {
-            return o.getTag().getTime().compareTo(getTag().getTime());
-        }
     }
 }

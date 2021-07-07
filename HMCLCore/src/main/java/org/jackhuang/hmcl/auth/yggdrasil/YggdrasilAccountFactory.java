@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,14 +13,14 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.auth.yggdrasil;
 
 import org.jackhuang.hmcl.auth.AccountFactory;
 import org.jackhuang.hmcl.auth.AuthenticationException;
 import org.jackhuang.hmcl.auth.CharacterSelector;
-import org.jackhuang.hmcl.util.UUIDTypeAdapter;
+import org.jackhuang.hmcl.util.javafx.ObservableOptionalCache;
 
 import java.util.Map;
 import java.util.Objects;
@@ -34,10 +34,17 @@ import static org.jackhuang.hmcl.util.Lang.tryCast;
  */
 public class YggdrasilAccountFactory extends AccountFactory<YggdrasilAccount> {
 
-    private final YggdrasilProvider provider;
+    public static final YggdrasilAccountFactory MOJANG = new YggdrasilAccountFactory(YggdrasilService.MOJANG);
 
-    public YggdrasilAccountFactory(YggdrasilProvider provider) {
-        this.provider = provider;
+    private final YggdrasilService service;
+
+    public YggdrasilAccountFactory(YggdrasilService service) {
+        this.service = service;
+    }
+
+    @Override
+    public AccountLoginType getLoginType() {
+        return AccountLoginType.USERNAME_PASSWORD;
     }
 
     @Override
@@ -46,9 +53,7 @@ public class YggdrasilAccountFactory extends AccountFactory<YggdrasilAccount> {
         Objects.requireNonNull(username);
         Objects.requireNonNull(password);
 
-        YggdrasilAccount account = new YggdrasilAccount(new YggdrasilService(provider), username, null, null);
-        account.logInWithPassword(password, selector);
-        return account;
+        return new YggdrasilAccount(service, username, password, selector);
     }
 
     @Override
@@ -60,10 +65,16 @@ public class YggdrasilAccountFactory extends AccountFactory<YggdrasilAccount> {
         String username = tryCast(storage.get("username"), String.class)
                 .orElseThrow(() -> new IllegalArgumentException("storage does not have username"));
 
-        return new YggdrasilAccount(new YggdrasilService(provider), username, session.getSelectedProfile().getId(), session);
-    }
+        tryCast(storage.get("profileProperties"), Map.class).ifPresent(
+                it -> {
+                    @SuppressWarnings("unchecked")
+                    Map<String, String> properties = it;
+                    GameProfile selected = session.getSelectedProfile();
+                    ObservableOptionalCache<UUID, CompleteGameProfile, AuthenticationException> profileRepository = service.getProfileRepository();
+                    profileRepository.put(selected.getId(), new CompleteGameProfile(selected, properties));
+                    profileRepository.invalidate(selected.getId());
+                });
 
-    public static String randomToken() {
-        return UUIDTypeAdapter.fromUUID(UUID.randomUUID());
+        return new YggdrasilAccount(service, username, session);
     }
 }

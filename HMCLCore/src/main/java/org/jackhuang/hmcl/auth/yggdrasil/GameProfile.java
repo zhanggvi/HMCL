@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,37 +13,34 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.auth.yggdrasil;
 
-import org.jackhuang.hmcl.util.Immutable;
-
+import java.util.Objects;
 import java.util.UUID;
 
+import org.jackhuang.hmcl.util.Immutable;
+import org.jackhuang.hmcl.util.gson.UUIDTypeAdapter;
+import org.jackhuang.hmcl.util.gson.Validation;
+
+import com.google.gson.JsonParseException;
+import com.google.gson.annotations.JsonAdapter;
+
 /**
- *
  * @author huangyuhui
  */
 @Immutable
-public final class GameProfile {
+public class GameProfile implements Validation {
 
+    @JsonAdapter(UUIDTypeAdapter.class)
     private final UUID id;
-    private final String name;
-    private final PropertyMap properties;
 
-    public GameProfile() {
-        this(null, null);
-    }
+    private final String name;
 
     public GameProfile(UUID id, String name) {
-        this(id, name, new PropertyMap());
-    }
-
-    public GameProfile(UUID id, String name, PropertyMap properties) {
-        this.id = id;
-        this.name = name;
-        this.properties = properties;
+        this.id = Objects.requireNonNull(id);
+        this.name = Objects.requireNonNull(name);
     }
 
     public UUID getId() {
@@ -54,11 +51,9 @@ public final class GameProfile {
         return name;
     }
 
-    /**
-     * @return nullable
-     */
-    public PropertyMap getProperties() {
-        return properties;
+    @Override
+    public void validate() throws JsonParseException {
+        Validation.requireNonNull(id, "Game profile id cannot be null");
+        Validation.requireNonNull(name, "Game profile name cannot be null");
     }
-
 }

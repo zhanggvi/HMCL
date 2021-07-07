@@ -1,15 +1,33 @@
 # Hello Minecraft! Launcher [![Build Status](https://ci.huangyuhui.net/job/HMCL/badge/icon?.svg)](https://ci.huangyuhui.net/job/HMCL)
-GPL v3, see http://www.gnu.org/licenses/gpl.html
 
 ## Introduction
 
 HMCL is a Minecraft launcher which supports Mod management, game customizing, auto installing(Forge, LiteLoader and OptiFine), modpack creating, UI customizing and so on.
 
-## Downloads
+No plugin API is provided.
 
-Binary version can be found here: https://ci.huangyuhui.net/job/HMCL
+## Download
+Download the latest version [from the official website](https://hmcl.huangyuhui.net/download)
 
-Archives in GitHub releases are built by closed CIs, uploaded here for backup.
+Note: Github releases are outdated.
+
+## License
+The software is distributed under [GPL v3](https://www.gnu.org/licenses/gpl-3.0.html) with additional terms.
+
+### Additional terms under GPLv3 Section 7
+1. When you distribute a modified version of the software, you must change the software name or the version number in a reasonable way in order to distinguish it from the original version. \[[under GPLv3, 7(c).](https://github.com/huanghongxun/HMCL/blob/11820e31a85d8989e41d97476712b07e7094b190/LICENSE#L372-L374)\]
+
+   The software name and the version number can be edited [here](https://github.com/huanghongxun/HMCL/blob/11820e31a85d8989e41d97476712b07e7094b190/HMCL/src/main/java/org/jackhuang/hmcl/Metadata.java#L31-L32).
+
+2. You must not remove the copyright declaration displayed in the software. \[[under GPLv3, 7(b).](https://github.com/huanghongxun/HMCL/blob/11820e31a85d8989e41d97476712b07e7094b190/LICENSE#L368-L370)\]
+
+Chinese Translation:
+### 附加条款（依据 GPLv3 协议第七条）
+1. 当你分发本程序的修改版本时，你必须以一种合理的方式修改本程序的名称或版本号，以示其与原始版本不同。\[[依据 GPLv3, 7(c).](https://github.com/huanghongxun/HMCL/blob/11820e31a85d8989e41d97476712b07e7094b190/LICENSE#L372-L374)\]
+
+   本程序的名称及版本号可在[此处](https://github.com/huanghongxun/HMCL/blob/11820e31a85d8989e41d97476712b07e7094b190/HMCL/src/main/java/org/jackhuang/hmcl/Metadata.java#L31-L32)修改。
+
+2. 你不得移除本程序所显示的版权声明。\[[依据 GPLv3, 7(b).](https://github.com/huanghongxun/HMCL/blob/11820e31a85d8989e41d97476712b07e7094b190/LICENSE#L368-L370)\]
 
 ## Contribution
 
@@ -18,102 +36,20 @@ If you want to submit a pull request, there're some requirements:
 * Compiler: Java 1.8.
 * Do NOT modify `gradle` files.
 
-## HMCLCore
+### Compilation
 
-Now HMCLCore is independent and you can use HMCLCore as a library to launch your game.
-
-### GameRepository
-
-Create a game repository `repository` to manage a minecraft installation. Like this.
-```java
-DefaultGameRepository repository = new DefaultGameRepository(new File(".minecraft").getAbsoluteFile());
+Simply execute following command:
+```bash
+./gradlew clean build
 ```
+Make sure you have Java installed with Pack200 and JavaFX 8 at least. Liberica full JDK 8~11 is recommended.
 
-You should put where your minecraft installation is to the only argument of the constructor of `DefaultGameRepository`.
-
-### Launching
-Now you can launch game by constructing a `DefaultLauncher`.
-```java
-DefaultLauncher launcher = new DefaultLauncher(
-        repository, // GameRepository
-        "test", // Your minecraft version name
-        new AccountBuilder.Builder()
-                .setUsername("playerId")
-                .setProxy(Proxy.NO_PROXY) // Optional
-                .create(OfflineAccountFactory.INSTANCE)
-                .logIn(), // account
-        // or new AccountBuilder.Builder()
-        //            .setUsername("someone@xxx.com")
-        //            .setPassword("someone's password")
-        //            // for Mojang account
-        //            .create(new YggdrasilAccountFactory(MojangYggdrasilProvider.INSTANCE))
-        //            // for Authlib Injector account
-        //            .create(new AuthlibInjectorAccountFactory(
-        //                new AuthlibInjectorDownloader(new File("path to save executables of authlib injector"),
-        //                        () -> MojangYggdrasilProvider.INSTANCE)::getArtifactInfo,
-        //                () -> AuthlibInjectorServer.fetchServerInfo("Your authlib injector auth server")))
-        //            .logIn()
-        new LaunchOptions.Builder()
-        		.setGameDir(repository.getBaseDirectory()) // directory that the game saves settings to
-        		.setMaxMemory(...)
-        		.setJava(...) // executable of JVM
-        		.setJavaArgs(...) // additional Java VM arguments
-        		.setMinecraftArgs(...) // additional Minecraft arguments
-        		.setHeight(...) // height of game window
-        		.setWidth(...)  // width of game window
-        		...
-        		.create(), 
-        new ProcessListener() { // listening the process state.
-            @Override
-            public void onLog(String log, Log4jLevel level) { // new console log
-                System.out.println(log);
-            }
-            
-            @Override
-            public void onExit(int exitCode, ExitType exitType) { // process exited
-                System.out.println("Process exited then exit code " + exitCode);
-            }
-        },
-        false // true if launcher process exits, listening threads exit too.
-);
-```
-Now you can simply call `launcher.launch()` to launch the game.
-If you want the command line, just call `launcher.getRawCommandLine`. Also, `StringUtils.makeCommand` might be useful.
-
-### Downloading
-HMCLCore just owns a simple way to download a new game.
-```java
-DefaultDependencyManager dependency = new DefaultDependencyManager(repository, new MojangDownloadProvider(), proxy);
-```
-`repository` is your `GameRepository`. `MojangDownloadProvider.INSTANCE` means that we download files from mojang servers. If you want BMCLAPI, `BMCLAPIDownloadProvider.INSTANCE` is just for you. `proxy` is `java.net.Proxy`, if you have a proxy, put it here, or `Proxy.NO_PROXY`.
-
-Now `GameBuilder` can build a game.
-```java
-Task gameBuildingTask = dependency.gameBuilder()
-                .name("test")
-                .gameVersion("1.12") // Minecraft version
-                .version("forge", "14.21.1.2426") // Forge version
-                .version("liteloader", "1.12-SNAPSHOT-4") // LiteLoader version
-                .version("optifine", "HD_U_C4") // OptiFine version
-                .buildAsync();
-```
-
-Nowadays HMCLCore only supports Forge, LiteLoader and OptiFine auto-installing.
-`buildAsync` will return a `Task`, you can call `Task.executor()::start` or simply `Task::start` to start this task. If you want to monitor the execution of tasks, you should see `TaskExecutor` and `Task::executor`.
-
-### Modpack installing
-
-HMCLCore supports Curse, MultiMC modpack.
-
-```java
-// Installing curse modpack
-new CurseInstallTask(dependency, modpackZipFile, CurseManifest.readCurseForgeModpackManifest(modpackZipFile), "name of the new game");
-
-// Installing MultiMC modpack
-new MultiMCModpackInstallTask(dependency, modpackZipFile, MultiMCInstanceConfiguration.readMultiMCModpackManifest(modpackZipFile), "name of the new game");
-// ** IMPORTANT **: You should read game settings from MultiMCInstanceConfiguration
-```
-
-## HMCL
-
-No plugin API.
+## JVM Options (for debugging)
+|Parameter|Description|
+|---------|-----------|
+|`-Dhmcl.self_integrity_check.disable=true`|Bypass the self integrity check when checking for update.|
+|`-Dhmcl.bmclapi.override=<version>`|Override api root of BMCLAPI download provider, defaults to `https://bmclapi2.bangbang93.com`. e.g. `https://download.mcbbs.net`.|
+|`-Dhmcl.font.override=<font family>`|Override font family.|
+|`-Dhmcl.version.override=<version>`|Override the version number.|
+|`-Dhmcl.update_source.override=<url>`|Override the update source.|
+|`-Dhmcl.authlibinjector.location=<path>`|Use specified authlib-injector (instead of downloading one).|

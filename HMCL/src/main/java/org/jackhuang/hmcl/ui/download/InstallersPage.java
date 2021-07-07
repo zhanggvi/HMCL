@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,88 +13,70 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.ui.download;
 
 import com.jfoenix.controls.JFXButton;
 import com.jfoenix.controls.JFXTextField;
+import javafx.beans.binding.Bindings;
+import javafx.beans.property.*;
 import javafx.fxml.FXML;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.control.Control;
 import javafx.scene.control.Label;
-import javafx.scene.layout.StackPane;
+import javafx.scene.control.Skin;
+import javafx.scene.control.SkinBase;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
-
-import org.jackhuang.hmcl.download.DownloadProvider;
 import org.jackhuang.hmcl.download.RemoteVersion;
 import org.jackhuang.hmcl.game.GameRepository;
-import org.jackhuang.hmcl.ui.FXUtils;
+import org.jackhuang.hmcl.ui.InstallerItem;
 import org.jackhuang.hmcl.ui.construct.Validator;
 import org.jackhuang.hmcl.ui.wizard.WizardController;
 import org.jackhuang.hmcl.ui.wizard.WizardPage;
 import org.jackhuang.hmcl.util.StringUtils;
-import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
+import org.jackhuang.hmcl.util.platform.OperatingSystem;
 
 import java.util.Map;
 
-public class InstallersPage extends StackPane implements WizardPage {
-    private final WizardController controller;
+import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
 
-    @FXML
-    private VBox list;
+public class InstallersPage extends Control implements WizardPage {
+    protected final WizardController controller;
 
-    @FXML
-    private JFXButton btnForge;
+    protected InstallerItem.InstallerItemGroup group = new InstallerItem.InstallerItemGroup();
+    protected JFXTextField txtName = new JFXTextField();
+    protected BooleanProperty installable = new SimpleBooleanProperty();
 
-    @FXML
-    private JFXButton btnLiteLoader;
-
-    @FXML
-    private JFXButton btnOptiFine;
-
-    @FXML
-    private Label lblGameVersion;
-
-    @FXML
-    private Label lblForge;
-
-    @FXML
-    private Label lblLiteLoader;
-
-    @FXML
-    private Label lblOptiFine;
-
-    @FXML
-    private JFXTextField txtName;
-
-    @FXML
-    private JFXButton btnInstall;
-
-    public InstallersPage(WizardController controller, GameRepository repository, DownloadProvider downloadProvider) {
+    public InstallersPage(WizardController controller, GameRepository repository, String gameVersion, InstallerWizardDownloadProvider downloadProvider) {
         this.controller = controller;
 
-        FXUtils.loadFXML(this, "/assets/fxml/download/installers.fxml");
-
-        String gameVersion = ((RemoteVersion<?>) controller.getSettings().get("game")).getGameVersion();
         Validator hasVersion = new Validator(s -> !repository.hasVersion(s) && StringUtils.isNotBlank(s));
         hasVersion.setMessage(i18n("install.new_game.already_exists"));
-        txtName.getValidators().add(hasVersion);
-        txtName.textProperty().addListener(e -> btnInstall.setDisable(!txtName.validate()));
+        Validator nameValidator = new Validator(OperatingSystem::isNameValid);
+        nameValidator.setMessage(i18n("install.new_game.malformed"));
+        txtName.getValidators().addAll(hasVersion, nameValidator);
+        installable.bind(Bindings.createBooleanBinding(() -> txtName.validate(),
+                txtName.textProperty()));
         txtName.setText(gameVersion);
 
-        btnForge.setOnMouseClicked(e -> {
-            controller.getSettings().put(INSTALLER_TYPE, 0);
-            controller.onNext(new VersionsPage(controller, i18n("install.installer.choose", i18n("install.installer.forge")), gameVersion, downloadProvider, "forge", () -> controller.onPrev(false)));
-        });
+        group.game.installable.setValue(false);
 
-        btnLiteLoader.setOnMouseClicked(e -> {
-            controller.getSettings().put(INSTALLER_TYPE, 1);
-            controller.onNext(new VersionsPage(controller, i18n("install.installer.choose", i18n("install.installer.liteloader")), gameVersion, downloadProvider, "liteloader", () -> controller.onPrev(false)));
-        });
-
-        btnOptiFine.setOnMouseClicked(e -> {
-            controller.getSettings().put(INSTALLER_TYPE, 2);
-            controller.onNext(new VersionsPage(controller, i18n("install.installer.choose", i18n("install.installer.optifine")), gameVersion, downloadProvider, "optifine", () -> controller.onPrev(false)));
-        });
+        for (InstallerItem library : group.getLibraries()) {
+            String libraryId = library.getLibraryId();
+            if (libraryId.equals("game")) continue;
+            library.action.set(e -> {
+                if (library.incompatibleLibraryName.get() == null)
+                    controller.onNext(new VersionsPage(controller, i18n("install.installer.choose", i18n("install.installer." + libraryId)), gameVersion, downloadProvider, libraryId, () -> controller.onPrev(false)));
+            });
+            library.removeAction.set(e -> {
+                controller.getSettings().remove(libraryId);
+                reload();
+            });
+        }
     }
 
     @Override
@@ -103,38 +85,85 @@ public class InstallersPage extends StackPane implements WizardPage {
     }
 
     private String getVersion(String id) {
-        return ((RemoteVersion<?>) controller.getSettings().get(id)).getSelfVersion();
+        return ((RemoteVersion) controller.getSettings().get(id)).getSelfVersion();
+    }
+
+    protected void reload() {
+        for (InstallerItem library : group.getLibraries()) {
+            String libraryId = library.getLibraryId();
+            if (controller.getSettings().containsKey(libraryId)) {
+                library.libraryVersion.set(getVersion(libraryId));
+                library.removable.set(true);
+            } else {
+                library.libraryVersion.set(null);
+                library.removable.set(false);
+            }
+        }
     }
 
     @Override
     public void onNavigate(Map<String, Object> settings) {
-        lblGameVersion.setText(i18n("install.new_game.current_game_version") + ": " + getVersion("game"));
-        if (controller.getSettings().containsKey("forge"))
-            lblForge.setText(i18n("install.installer.version", i18n("install.installer.forge")) + ": " + getVersion("forge"));
-        else
-            lblForge.setText(i18n("install.installer.not_installed", i18n("install.installer.forge")));
-
-        if (controller.getSettings().containsKey("liteloader"))
-            lblLiteLoader.setText(i18n("install.installer.version", i18n("install.installer.liteloader")) + ": " + getVersion("liteloader"));
-        else
-            lblLiteLoader.setText(i18n("install.installer.not_installed", i18n("install.installer.liteloader")));
-
-        if (controller.getSettings().containsKey("optifine"))
-            lblOptiFine.setText(i18n("install.installer.version", i18n("install.installer.optifine")) + ": " + getVersion("optifine"));
-        else
-            lblOptiFine.setText(i18n("install.installer.not_installed", i18n("install.installer.optifine")));
+        reload();
     }
 
     @Override
     public void cleanup(Map<String, Object> settings) {
-        settings.remove(INSTALLER_TYPE);
     }
 
     @FXML
-    private void onInstall() {
+    protected void onInstall() {
         controller.getSettings().put("name", txtName.getText());
         controller.onFinish();
     }
 
-    public static final String INSTALLER_TYPE = "INSTALLER_TYPE";
+    @Override
+    protected Skin<?> createDefaultSkin() {
+        return new InstallersPageSkin(this);
+    }
+
+    protected static class InstallersPageSkin extends SkinBase<InstallersPage> {
+
+        /**
+         * Constructor for all SkinBase instances.
+         *
+         * @param control The control for which this Skin should attach to.
+         */
+        protected InstallersPageSkin(InstallersPage control) {
+            super(control);
+
+            BorderPane root = new BorderPane();
+            root.setPadding(new Insets(16));
+
+            VBox list = new VBox(8);
+            root.setCenter(list);
+            {
+                HBox versionNamePane = new HBox(8);
+                versionNamePane.setAlignment(Pos.CENTER_LEFT);
+                versionNamePane.getStyleClass().add("card");
+                versionNamePane.setStyle("-fx-padding: 20 8 20 16");
+
+                versionNamePane.getChildren().add(new Label(i18n("archive.name")));
+
+                control.txtName.setMaxWidth(300);
+                versionNamePane.getChildren().add(control.txtName);
+                list.getChildren().add(versionNamePane);
+            }
+
+            list.getChildren().addAll(control.group.getLibraries());
+
+            {
+                JFXButton installButton = new JFXButton(i18n("button.install"));
+                installButton.disableProperty().bind(control.installable.not());
+                installButton.getStyleClass().add("jfx-button-raised");
+                installButton.setButtonType(JFXButton.ButtonType.RAISED);
+                installButton.setPrefWidth(100);
+                installButton.setPrefHeight(40);
+                installButton.setOnMouseClicked(e -> control.onInstall());
+                BorderPane.setAlignment(installButton, Pos.CENTER_RIGHT);
+                root.setBottom(installButton);
+            }
+
+            getChildren().setAll(root);
+        }
+    }
 }

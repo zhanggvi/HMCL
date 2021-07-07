@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,11 +13,13 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.game;
 
 import com.google.gson.*;
+import com.google.gson.annotations.JsonAdapter;
+
 import org.jackhuang.hmcl.util.Immutable;
 
 import java.lang.reflect.Type;
@@ -28,6 +30,7 @@ import java.util.Map;
  *
  * @author huangyuhui
  */
+@JsonAdapter(Argument.Deserializer.class)
 @Immutable
 public interface Argument extends Cloneable {
 
@@ -40,13 +43,7 @@ public interface Argument extends Cloneable {
      */
     List<String> toString(Map<String, String> keys, Map<String, Boolean> features);
 
-    class Serializer implements JsonDeserializer<Argument>, JsonSerializer<Argument> {
-
-        public static final Serializer INSTANCE = new Serializer();
-
-        private Serializer() {
-        }
-
+    class Deserializer implements JsonDeserializer<Argument> {
         @Override
         public Argument deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
             if (json.isJsonPrimitive())
@@ -54,16 +51,5 @@ public interface Argument extends Cloneable {
             else
                 return context.deserialize(json, RuledArgument.class);
         }
-
-        @Override
-        public JsonElement serialize(Argument src, Type typeOfSrc, JsonSerializationContext context) {
-            if (src instanceof StringArgument)
-                return new JsonPrimitive(((StringArgument) src).getArgument());
-            else if (src instanceof RuledArgument)
-                return context.serialize(src, RuledArgument.class);
-            else
-                throw new AssertionError("Unrecognized argument type: " + src);
-        }
-
     }
 }

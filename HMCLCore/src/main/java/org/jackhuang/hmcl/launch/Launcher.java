@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,7 +13,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.launch;
 
@@ -21,7 +21,7 @@ import org.jackhuang.hmcl.auth.AuthInfo;
 import org.jackhuang.hmcl.game.GameRepository;
 import org.jackhuang.hmcl.game.LaunchOptions;
 import org.jackhuang.hmcl.game.Version;
-import org.jackhuang.hmcl.util.ManagedProcess;
+import org.jackhuang.hmcl.util.platform.ManagedProcess;
 
 import java.io.File;
 import java.io.IOException;
@@ -33,30 +33,27 @@ import java.io.IOException;
 public abstract class Launcher {
 
     protected final GameRepository repository;
-    protected final String versionId;
     protected final Version version;
     protected final AuthInfo authInfo;
     protected final LaunchOptions options;
     protected final ProcessListener listener;
     protected final boolean daemon;
 
-    public Launcher(GameRepository repository, String versionId, AuthInfo authInfo, LaunchOptions options) {
-        this(repository, versionId, authInfo, options, null);
+    public Launcher(GameRepository repository, Version version, AuthInfo authInfo, LaunchOptions options) {
+        this(repository, version, authInfo, options, null);
     }
 
-    public Launcher(GameRepository repository, String versionId, AuthInfo authInfo, LaunchOptions options, ProcessListener listener) {
-        this(repository, versionId, authInfo, options, listener, true);
+    public Launcher(GameRepository repository, Version version, AuthInfo authInfo, LaunchOptions options, ProcessListener listener) {
+        this(repository, version, authInfo, options, listener, true);
     }
 
-    public Launcher(GameRepository repository, String versionId, AuthInfo authInfo, LaunchOptions options, ProcessListener listener, boolean daemon) {
+    public Launcher(GameRepository repository, Version version, AuthInfo authInfo, LaunchOptions options, ProcessListener listener, boolean daemon) {
         this.repository = repository;
-        this.versionId = versionId;
+        this.version = version;
         this.authInfo = authInfo;
         this.options = options;
         this.listener = listener;
         this.daemon = daemon;
-
-        version = repository.getResolvedVersion(versionId);
     }
 
     /**

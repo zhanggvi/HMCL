@@ -1,6 +1,6 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -13,7 +13,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.ui.construct;
 
@@ -24,6 +24,7 @@ import javafx.beans.NamedArg;
 import javafx.beans.property.*;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
@@ -34,19 +35,19 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
-
 import org.jackhuang.hmcl.setting.Theme;
 import org.jackhuang.hmcl.ui.Controllers;
 import org.jackhuang.hmcl.ui.FXUtils;
 import org.jackhuang.hmcl.ui.SVG;
-import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
 
 import java.io.File;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.function.Consumer;
 
-public class MultiFileItem<T> extends ComponentList {
+import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
+
+public class MultiFileItem<T> extends ComponentSublist {
     private final StringProperty customTitle = new SimpleStringProperty(this, "customTitle", i18n("selector.custom"));
     private final StringProperty chooserTitle = new SimpleStringProperty(this, "chooserTitle", i18n("selector.choose_file"));
     private final BooleanProperty directory = new SimpleBooleanProperty(this, "directory", false);
@@ -106,7 +107,7 @@ public class MultiFileItem<T> extends ComponentList {
 
         if (hasCustom)
             pane.getChildren().add(custom);
-        addChildren(pane);
+        getContent().add(pane);
 
         group.selectedToggleProperty().addListener((a, b, newValue) -> {
             if (toggleSelectedListener != null)
@@ -138,7 +139,7 @@ public class MultiFileItem<T> extends ComponentList {
 
     public Node createChildren(String title, String subtitle, T userData) {
         BorderPane pane = new BorderPane();
-        pane.setStyle("-fx-padding: 3;");
+        pane.setPadding(new Insets(3));
         FXUtils.setLimitHeight(pane, 20);
 
         JFXRadioButton left = new JFXRadioButton(title);
@@ -147,6 +148,7 @@ public class MultiFileItem<T> extends ComponentList {
         pane.setLeft(left);
 
         Label right = new Label(subtitle);
+        right.setWrapText(true);
         right.getStyleClass().add("subtitle-label");
         right.setStyle("-fx-font-size: 10;");
         pane.setRight(right);

@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,41 +13,61 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.ui;
 
+import javafx.beans.property.DoubleProperty;
+import javafx.beans.property.SimpleDoubleProperty;
 import javafx.scene.Node;
 import javafx.scene.Scene;
-import javafx.scene.image.Image;
 import javafx.scene.layout.Region;
+import javafx.scene.paint.Color;
 import javafx.stage.Stage;
+import javafx.stage.StageStyle;
 import org.jackhuang.hmcl.Launcher;
-import org.jackhuang.hmcl.setting.Settings;
+import org.jackhuang.hmcl.Metadata;
+import org.jackhuang.hmcl.download.java.JavaRepository;
+import org.jackhuang.hmcl.setting.EnumCommonDirectory;
 import org.jackhuang.hmcl.task.Task;
 import org.jackhuang.hmcl.task.TaskExecutor;
-import org.jackhuang.hmcl.ui.construct.DialogCloseEvent;
+import org.jackhuang.hmcl.ui.account.AuthlibInjectorServersPage;
+import org.jackhuang.hmcl.ui.account.MicrosoftAccountLoginStage;
+import org.jackhuang.hmcl.ui.animation.ContainerAnimations;
 import org.jackhuang.hmcl.ui.construct.InputDialogPane;
-import org.jackhuang.hmcl.ui.construct.MessageBox;
 import org.jackhuang.hmcl.ui.construct.MessageDialogPane;
+import org.jackhuang.hmcl.ui.construct.MessageDialogPane.MessageType;
+import org.jackhuang.hmcl.ui.construct.PromptDialogPane;
 import org.jackhuang.hmcl.ui.construct.TaskExecutorDialogPane;
+import org.jackhuang.hmcl.ui.decorator.DecoratorController;
+import org.jackhuang.hmcl.ui.main.RootPage;
+import org.jackhuang.hmcl.ui.versions.VersionPage;
 import org.jackhuang.hmcl.util.FutureCallback;
-import org.jackhuang.hmcl.util.JavaVersion;
+import org.jackhuang.hmcl.util.Logging;
+import org.jackhuang.hmcl.util.io.FileUtils;
+import org.jackhuang.hmcl.util.platform.JavaVersion;
 
-import static org.jackhuang.hmcl.setting.ConfigHolder.CONFIG;
-
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
+import static org.jackhuang.hmcl.setting.ConfigHolder.config;
+import static org.jackhuang.hmcl.ui.FXUtils.newImage;
+import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
+
 public final class Controllers {
+    private static DoubleProperty stageWidth = new SimpleDoubleProperty();
+    private static DoubleProperty stageHeight = new SimpleDoubleProperty();
 
     private static Scene scene;
     private static Stage stage;
-    private static MainPage mainPage = null;
-    private static SettingsPage settingsPage = null;
     private static VersionPage versionPage = null;
     private static AuthlibInjectorServersPage serversPage = null;
-    private static LeftPaneController leftPaneController;
-    private static Decorator decorator;
+    private static RootPage rootPage;
+    private static DecoratorController decorator;
+
+    private Controllers() {
+    }
 
     public static Scene getScene() {
         return scene;
@@ -58,17 +78,17 @@ public final class Controllers {
     }
 
     // FXThread
-    public static SettingsPage getSettingsPage() {
-        if (settingsPage == null)
-            settingsPage = new SettingsPage();
-        return settingsPage;
-    }
-
-    // FXThread
     public static VersionPage getVersionPage() {
         if (versionPage == null)
             versionPage = new VersionPage();
         return versionPage;
+    }
+
+    // FXThread
+    public static RootPage getRootPage() {
+        if (rootPage == null)
+            rootPage = new RootPage();
+        return rootPage;
     }
 
     // FXThread
@@ -79,43 +99,50 @@ public final class Controllers {
     }
 
     // FXThread
-    public static Decorator getDecorator() {
+    public static DecoratorController getDecorator() {
         return decorator;
     }
 
-    public static MainPage getMainPage() {
-        if (mainPage == null)
-            mainPage = new MainPage();
-        return mainPage;
-    }
-
-    public static LeftPaneController getLeftPaneController() {
-        return leftPaneController;
+    public static void onApplicationStop() {
+        config().setHeight(stageHeight.get());
+        config().setWidth(stageWidth.get());
     }
 
     public static void initialize(Stage stage) {
+        Logging.LOG.info("Start initializing application");
+
         Controllers.stage = stage;
+        MicrosoftAccountLoginStage.INSTANCE.initOwner(stage);
+
+        stage.setHeight(config().getHeight());
+        stageHeight.bind(stage.heightProperty());
+        stage.setWidth(config().getWidth());
+        stageWidth.bind(stage.widthProperty());
 
         stage.setOnCloseRequest(e -> Launcher.stopApplication());
 
-        decorator = new Decorator(stage, getMainPage(), Launcher.TITLE, false, true);
-        decorator.showPage(null);
-        leftPaneController = new LeftPaneController(decorator.getLeftPane());
+        decorator = new DecoratorController(stage, getRootPage());
 
-        Settings.INSTANCE.onProfileLoading();
-        Task.of(JavaVersion::initialize).start();
+        if (config().getCommonDirType() == EnumCommonDirectory.CUSTOM &&
+                !FileUtils.canCreateDirectory(config().getCommonDirectory())) {
+            config().setCommonDirType(EnumCommonDirectory.DEFAULT);
+            dialog(i18n("launcher.cache_directory.invalid"));
+        }
 
-        decorator.setCustomMaximize(false);
+        Task.runAsync(JavaVersion::initialize).thenRunAsync(JavaRepository::initialize).start();
 
-        scene = new Scene(decorator, 804, 521);
-        scene.getStylesheets().setAll(CONFIG.getTheme().getStylesheets());
-        stage.setMinWidth(804);
-        stage.setMaxWidth(804);
-        stage.setMinHeight(521);
-        stage.setMaxHeight(521);
+        scene = new Scene(decorator.getDecorator());
+        scene.setFill(Color.TRANSPARENT);
+        stage.setMinHeight(482 + 32);
+        stage.setMinWidth(802 + 32);
+        decorator.getDecorator().prefWidthProperty().bind(scene.widthProperty());
+        decorator.getDecorator().prefHeightProperty().bind(scene.heightProperty());
+        scene.getStylesheets().setAll(config().getTheme().getStylesheets());
 
-        stage.getIcons().add(new Image("/assets/img/icon.png"));
-        stage.setTitle(Launcher.TITLE);
+        stage.getIcons().add(newImage("/assets/img/icon.png"));
+        stage.setTitle(Metadata.TITLE);
+        stage.initStyle(StageStyle.TRANSPARENT);
+        stage.setScene(scene);
     }
 
     public static void dialog(Region content) {
@@ -128,60 +155,51 @@ public final class Controllers {
     }
 
     public static void dialog(String text, String title) {
-        dialog(text, title, MessageBox.INFORMATION_MESSAGE);
+        dialog(text, title, MessageType.INFORMATION);
     }
 
-    public static void dialog(String text, String title, int type) {
+    public static void dialog(String text, String title, MessageType type) {
         dialog(text, title, type, null);
     }
 
-    public static void dialog(String text, String title, int type, Runnable onAccept) {
+    public static void dialog(String text, String title, MessageType type, Runnable onAccept) {
         dialog(new MessageDialogPane(text, title, type, onAccept));
     }
 
-    public static void confirmDialog(String text, String title, Runnable onAccept, Runnable onCancel) {
+    public static void confirm(String text, String title, Runnable onAccept, Runnable onCancel) {
         dialog(new MessageDialogPane(text, title, onAccept, onCancel));
     }
 
-    public static InputDialogPane inputDialog(String text, FutureCallback<String> onResult) {
-        InputDialogPane pane = new InputDialogPane(text, onResult);
+    public static CompletableFuture<String> prompt(String title, FutureCallback<String> onResult) {
+        return prompt(title, onResult, "");
+    }
+
+    public static CompletableFuture<String> prompt(String title, FutureCallback<String> onResult, String initialValue) {
+        InputDialogPane pane = new InputDialogPane(title, initialValue, onResult);
         dialog(pane);
-        return pane;
+        return pane.getCompletableFuture();
     }
 
-    public static Region taskDialog(TaskExecutor executor, String title, String subtitle) {
-        return taskDialog(executor, title, subtitle, null);
+    public static CompletableFuture<List<PromptDialogPane.Builder.Question<?>>> prompt(PromptDialogPane.Builder builder) {
+        PromptDialogPane pane = new PromptDialogPane(builder);
+        dialog(pane);
+        return pane.getCompletableFuture();
     }
 
-    public static Region taskDialog(TaskExecutor executor, String title, String subtitle, Consumer<Region> onCancel) {
+    public static TaskExecutorDialogPane taskDialog(TaskExecutor executor, String title) {
+        return taskDialog(executor, title, null);
+    }
+
+    public static TaskExecutorDialogPane taskDialog(TaskExecutor executor, String title, Consumer<Region> onCancel) {
         TaskExecutorDialogPane pane = new TaskExecutorDialogPane(onCancel);
         pane.setTitle(title);
-        pane.setSubtitle(subtitle);
         pane.setExecutor(executor);
         dialog(pane);
         return pane;
     }
 
-    /**
-     * Use {@link DialogCloseEvent}
-     */
-    public static void closeDialog(Region content) {
-        if (stage == null) // shut down
-            return;
-        decorator.closeDialog(content);
-    }
-
     public static void navigate(Node node) {
-        if (decorator.getNowPage() == node)
-            decorator.showPage(null);
-        else
-            decorator.showPage(node);
-    }
-
-    public static void showUpdate() {
-        if (stage == null) // shut down
-            return;
-        getLeftPaneController().showUpdate();
+        decorator.getNavigator().navigate(node, ContainerAnimations.FADE.getAnimationProducer());
     }
 
     public static boolean isStopped() {
@@ -189,8 +207,7 @@ public final class Controllers {
     }
 
     public static void shutdown() {
-        mainPage = null;
-        settingsPage = null;
+        rootPage = null;
         versionPage = null;
         serversPage = null;
         decorator = null;

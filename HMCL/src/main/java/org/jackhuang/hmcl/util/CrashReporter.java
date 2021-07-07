@@ -1,6 +1,6 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -13,17 +13,19 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.util;
 
 import javafx.application.Platform;
-import org.jackhuang.hmcl.Launcher;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Alert.AlertType;
+import org.jackhuang.hmcl.Metadata;
 import org.jackhuang.hmcl.ui.CrashWindow;
-import org.jackhuang.hmcl.ui.construct.MessageBox;
-import static java.util.Collections.newSetFromMap;
-import static org.jackhuang.hmcl.util.Logging.LOG;
-import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
+import org.jackhuang.hmcl.upgrade.IntegrityChecker;
+import org.jackhuang.hmcl.upgrade.UpdateChecker;
+import org.jackhuang.hmcl.util.io.NetworkUtils;
+import org.jackhuang.hmcl.util.platform.OperatingSystem;
 
 import java.io.IOException;
 import java.text.SimpleDateFormat;
@@ -33,6 +35,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
+
+import static java.util.Collections.newSetFromMap;
+import static org.jackhuang.hmcl.util.Logging.LOG;
+import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
 
 /**
  * @author huangyuhui
@@ -45,9 +51,11 @@ public class CrashReporter implements Thread.UncaughtExceptionHandler {
             put("Location is not set", i18n("crash.NoClassDefFound"));
             put("UnsatisfiedLinkError", i18n("crash.user_fault"));
             put("java.lang.NoClassDefFoundError", i18n("crash.NoClassDefFound"));
+            put("org.jackhuang.hmcl.util.ResourceNotFoundError", i18n("crash.NoClassDefFound"));
             put("java.lang.VerifyError", i18n("crash.NoClassDefFound"));
             put("java.lang.NoSuchMethodError", i18n("crash.NoClassDefFound"));
             put("java.lang.NoSuchFieldError", i18n("crash.NoClassDefFound"));
+            put("javax.imageio.IIOException", i18n("crash.NoClassDefFound"));
             put("netscape.javascript.JSException", i18n("crash.NoClassDefFound"));
             put("java.lang.IncompatibleClassChangeError", i18n("crash.NoClassDefFound"));
             put("java.lang.ClassFormatError", i18n("crash.NoClassDefFound"));
@@ -64,7 +72,10 @@ public class CrashReporter implements Thread.UncaughtExceptionHandler {
                     String info = entry.getValue();
                     LOG.severe(info);
                     try {
-                        MessageBox.show(info);
+                        Alert alert = new Alert(AlertType.INFORMATION, info);
+                        alert.setTitle(i18n("message.info"));
+                        alert.setHeaderText(i18n("message.info"));
+                        alert.showAndWait();
                     } catch (Throwable t) {
                         LOG.log(Level.SEVERE, "Unable to show message", t);
                     }
@@ -75,6 +86,12 @@ public class CrashReporter implements Thread.UncaughtExceptionHandler {
     }
 
     private static Set<String> CAUGHT_EXCEPTIONS = newSetFromMap(new ConcurrentHashMap<>());
+
+    private final boolean showCrashWindow;
+
+    public CrashReporter(boolean showCrashWindow) {
+        this.showCrashWindow = showCrashWindow;
+    }
 
     @Override
     public void uncaughtException(Thread t, Throwable e) {
@@ -90,7 +107,7 @@ public class CrashReporter implements Thread.UncaughtExceptionHandler {
             CAUGHT_EXCEPTIONS.add(stackTrace);
 
             String text = "---- Hello Minecraft! Crash Report ----\n" +
-                    "  Version: " + Launcher.VERSION + "\n" +
+                    "  Version: " + Metadata.VERSION + "\n" +
                     "  Time: " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()) + "\n" +
                     "  Thread: " + t.toString() + "\n" +
                     "\n  Content: \n    " +
@@ -98,15 +115,22 @@ public class CrashReporter implements Thread.UncaughtExceptionHandler {
                     "-- System Details --\n" +
                     "  Operating System: " + System.getProperty("os.name") + ' ' + OperatingSystem.SYSTEM_VERSION + "\n" +
                     "  Java Version: " + System.getProperty("java.version") + ", " + System.getProperty("java.vendor") + "\n" +
-                    "  Java VM Version: " + System.getProperty("java.vm.name") + " (" + System.getProperty("java.vm.info") + "), " + System.getProperty("java.vm.vendor") + "\n";
+                    "  Java VM Version: " + System.getProperty("java.vm.name") + " (" + System.getProperty("java.vm.info") + "), " + System.getProperty("java.vm.vendor") + "\n" +
+                    "  JVM Max Memory: " + Runtime.getRuntime().maxMemory() + "\n" +
+                    "  JVM Total Memory: " + Runtime.getRuntime().totalMemory() + "\n" +
+                    "  JVM Free Memory: " + Runtime.getRuntime().freeMemory() + "\n";
 
             LOG.log(Level.SEVERE, text);
-
-            if (checkThrowable(e)) {
-                Platform.runLater(() -> new CrashWindow(text).show());
-                if (!Launcher.UPDATE_CHECKER.isOutOfDate())
-                    reportToServer(text);
-            }
+            Platform.runLater(() -> {
+                if (checkThrowable(e)) {
+                    if (showCrashWindow) {
+                        new CrashWindow(text).show();
+                    }
+                    if (!UpdateChecker.isOutdated() && IntegrityChecker.isSelfVerified()) {
+                        reportToServer(text);
+                    }
+                }
+            });
         } catch (Throwable handlingException) {
             LOG.log(Level.SEVERE, "Unable to handle uncaught exception", handlingException);
         }
@@ -116,7 +140,7 @@ public class CrashReporter implements Thread.UncaughtExceptionHandler {
         Thread t = new Thread(() -> {
             HashMap<String, String> map = new HashMap<>();
             map.put("crash_report", text);
-            map.put("version", Launcher.VERSION);
+            map.put("version", Metadata.VERSION);
             map.put("log", Logging.getLogs());
             try {
                 String response = NetworkUtils.doPost(NetworkUtils.toURL("https://hmcl.huangyuhui.net/hmcl/crash.php"), map);

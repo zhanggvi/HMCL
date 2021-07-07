@@ -1,6 +1,6 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -13,7 +13,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.ui;
 
@@ -22,15 +22,15 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
-import javafx.scene.image.Image;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
+import org.jackhuang.hmcl.Metadata;
+import org.jackhuang.hmcl.upgrade.UpdateChecker;
 
+import static org.jackhuang.hmcl.ui.FXUtils.newImage;
 import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
-
-import org.jackhuang.hmcl.Launcher;
 
 /**
  * @author huangyuhui
@@ -39,7 +39,7 @@ public class CrashWindow extends Stage {
 
     public CrashWindow(String text) {
         Label lblCrash = new Label();
-        if (Launcher.UPDATE_CHECKER.isOutOfDate())
+        if (UpdateChecker.isOutdated())
             lblCrash.setText(i18n("launcher.crash_out_dated"));
         else
             lblCrash.setText(i18n("launcher.crash"));
@@ -51,7 +51,7 @@ public class CrashWindow extends Stage {
 
         Button btnContact = new Button();
         btnContact.setText(i18n("launcher.contact"));
-        btnContact.setOnMouseClicked(event -> FXUtils.openLink(Launcher.CONTACT));
+        btnContact.setOnMouseClicked(event -> FXUtils.openLink(Metadata.CONTACT_URL));
         HBox box = new HBox();
         box.setStyle("-fx-padding: 8px;");
         box.getChildren().add(btnContact);
@@ -67,7 +67,7 @@ public class CrashWindow extends Stage {
 
         Scene scene = new Scene(pane, 800, 480);
         setScene(scene);
-        getIcons().add(new Image("/assets/img/icon.png"));
+        getIcons().add(newImage("/assets/img/icon.png"));
         setTitle(i18n("message.error"));
 
         setOnCloseRequest(e -> System.exit(1));

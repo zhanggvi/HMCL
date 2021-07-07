@@ -1,6 +1,6 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -13,32 +13,36 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.setting;
 
 import com.google.gson.*;
+import com.google.gson.annotations.JsonAdapter;
 import javafx.beans.InvalidationListener;
-import org.jackhuang.hmcl.Launcher;
-import org.jackhuang.hmcl.game.LaunchOptions;
-import org.jackhuang.hmcl.util.*;
+import javafx.beans.property.*;
+import org.jackhuang.hmcl.game.GameDirectoryType;
+import org.jackhuang.hmcl.game.NativesDirectoryType;
+import org.jackhuang.hmcl.util.Lang;
+import org.jackhuang.hmcl.util.StringUtils;
+import org.jackhuang.hmcl.util.platform.JavaVersion;
+import org.jackhuang.hmcl.util.platform.OperatingSystem;
+import org.jackhuang.hmcl.util.platform.Platform;
 
-import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Type;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
-
-import static org.jackhuang.hmcl.setting.ConfigHolder.CONFIG;
 
 /**
  *
  * @author huangyuhui
  */
-public final class VersionSetting {
-
-    public transient String id;
+@JsonAdapter(VersionSetting.Serializer.class)
+public final class VersionSetting implements Cloneable {
 
     private boolean global = false;
 
@@ -50,9 +54,9 @@ public final class VersionSetting {
         this.global = global;
     }
 
-    private final ImmediateBooleanProperty usesGlobalProperty = new ImmediateBooleanProperty(this, "usesGlobal", false);
+    private final BooleanProperty usesGlobalProperty = new SimpleBooleanProperty(this, "usesGlobal", false);
 
-    public ImmediateBooleanProperty usesGlobalProperty() {
+    public BooleanProperty usesGlobalProperty() {
         return usesGlobalProperty;
     }
 
@@ -61,7 +65,7 @@ public final class VersionSetting {
      * 1. Global settings.
      * 2. Version settings.
      * If a version claims that it uses global settings, its version setting will be disabled.
-     *
+     * <p>
      * Defaults false because if one version uses global first, custom version file will not be generated.
      */
     public boolean isUsesGlobal() {
@@ -74,9 +78,9 @@ public final class VersionSetting {
 
     // java
 
-    private final ImmediateStringProperty javaProperty = new ImmediateStringProperty(this, "java", "");
+    private final StringProperty javaProperty = new SimpleStringProperty(this, "java", "");
 
-    public ImmediateStringProperty javaProperty() {
+    public StringProperty javaProperty() {
         return javaProperty;
     }
 
@@ -100,7 +104,7 @@ public final class VersionSetting {
         setDefaultJavaPath(null);
     }
 
-    private final ImmediateStringProperty defaultJavaPathProperty = new ImmediateStringProperty(this, "defaultJavaPath", "");
+    private final StringProperty defaultJavaPathProperty = new SimpleStringProperty(this, "defaultJavaPath", "");
 
     /**
      * Path to Java executable, or null if user customizes java directory.
@@ -114,9 +118,42 @@ public final class VersionSetting {
         defaultJavaPathProperty.set(defaultJavaPath);
     }
 
-    private final ImmediateStringProperty javaDirProperty = new ImmediateStringProperty(this, "javaDir", "");
+    /**
+     * 0 - .minecraft/versions/&lt;version&gt;/natives/<br/>
+     */
+    private final ObjectProperty<NativesDirectoryType> nativesDirTypeProperty = new SimpleObjectProperty<>(this, "nativesDirType", NativesDirectoryType.VERSION_FOLDER);
 
-    public ImmediateStringProperty javaDirProperty() {
+    public ObjectProperty<NativesDirectoryType> nativesDirTypeProperty() {
+        return nativesDirTypeProperty;
+    }
+
+    public NativesDirectoryType getNativesDirType() {
+        return nativesDirTypeProperty.get();
+    }
+
+    public void setNativesDirType(NativesDirectoryType nativesDirType) {
+        nativesDirTypeProperty.set(nativesDirType);
+    }
+
+    // Path to lwjgl natives directory
+
+    private final StringProperty nativesDirProperty = new SimpleStringProperty(this, "nativesDirProperty", "");
+
+    public StringProperty nativesDirProperty() {
+        return nativesDirProperty;
+    }
+
+    public String getNativesDir() {
+        return nativesDirProperty.get();
+    }
+
+    public void setNativesDir(String nativesDir) {
+        nativesDirProperty.set(nativesDir);
+    }
+
+    private final StringProperty javaDirProperty = new SimpleStringProperty(this, "javaDir", "");
+
+    public StringProperty javaDirProperty() {
         return javaDirProperty;
     }
 
@@ -131,9 +168,9 @@ public final class VersionSetting {
         javaDirProperty.set(javaDir);
     }
 
-    private final ImmediateStringProperty wrapperProperty = new ImmediateStringProperty(this, "wrapper", "");
+    private final StringProperty wrapperProperty = new SimpleStringProperty(this, "wrapper", "");
 
-    public ImmediateStringProperty wrapperProperty() {
+    public StringProperty wrapperProperty() {
         return wrapperProperty;
     }
 
@@ -148,9 +185,9 @@ public final class VersionSetting {
         wrapperProperty.set(wrapper);
     }
 
-    private final ImmediateStringProperty permSizeProperty = new ImmediateStringProperty(this, "permSize", "");
+    private final StringProperty permSizeProperty = new SimpleStringProperty(this, "permSize", "");
 
-    public ImmediateStringProperty permSizeProperty() {
+    public StringProperty permSizeProperty() {
         return permSizeProperty;
     }
 
@@ -165,9 +202,9 @@ public final class VersionSetting {
         permSizeProperty.set(permSize);
     }
 
-    private final ImmediateIntegerProperty maxMemoryProperty = new ImmediateIntegerProperty(this, "maxMemory", OperatingSystem.SUGGESTED_MEMORY);
+    private final IntegerProperty maxMemoryProperty = new SimpleIntegerProperty(this, "maxMemory", OperatingSystem.SUGGESTED_MEMORY);
 
-    public ImmediateIntegerProperty maxMemoryProperty() {
+    public IntegerProperty maxMemoryProperty() {
         return maxMemoryProperty;
     }
 
@@ -185,9 +222,9 @@ public final class VersionSetting {
     /**
      * The minimum memory that JVM can allocate for heap.
      */
-    private final ImmediateObjectProperty<Integer> minMemoryProperty = new ImmediateObjectProperty<>(this, "minMemory", null);
+    private final ObjectProperty<Integer> minMemoryProperty = new SimpleObjectProperty<>(this, "minMemory", null);
 
-    public ImmediateObjectProperty<Integer> minMemoryProperty() {
+    public ObjectProperty<Integer> minMemoryProperty() {
         return minMemoryProperty;
     }
 
@@ -199,9 +236,9 @@ public final class VersionSetting {
         minMemoryProperty.set(minMemory);
     }
 
-    private final ImmediateStringProperty preLaunchCommandProperty = new ImmediateStringProperty(this, "precalledCommand", "");
+    private final StringProperty preLaunchCommandProperty = new SimpleStringProperty(this, "precalledCommand", "");
 
-    public ImmediateStringProperty preLaunchCommandProperty() {
+    public StringProperty preLaunchCommandProperty() {
         return preLaunchCommandProperty;
     }
 
@@ -219,9 +256,9 @@ public final class VersionSetting {
 
     // options
 
-    private final ImmediateStringProperty javaArgsProperty = new ImmediateStringProperty(this, "javaArgs", "");
+    private final StringProperty javaArgsProperty = new SimpleStringProperty(this, "javaArgs", "");
 
-    public ImmediateStringProperty javaArgsProperty() {
+    public StringProperty javaArgsProperty() {
         return javaArgsProperty;
     }
 
@@ -236,9 +273,9 @@ public final class VersionSetting {
         javaArgsProperty.set(javaArgs);
     }
 
-    private final ImmediateStringProperty minecraftArgsProperty = new ImmediateStringProperty(this, "minecraftArgs", "");
+    private final StringProperty minecraftArgsProperty = new SimpleStringProperty(this, "minecraftArgs", "");
 
-    public ImmediateStringProperty minecraftArgsProperty() {
+    public StringProperty minecraftArgsProperty() {
         return minecraftArgsProperty;
     }
 
@@ -253,9 +290,9 @@ public final class VersionSetting {
         minecraftArgsProperty.set(minecraftArgs);
     }
 
-    private final ImmediateBooleanProperty noJVMArgsProperty = new ImmediateBooleanProperty(this, "noJVMArgs", false);
+    private final BooleanProperty noJVMArgsProperty = new SimpleBooleanProperty(this, "noJVMArgs", false);
 
-    public ImmediateBooleanProperty noJVMArgsProperty() {
+    public BooleanProperty noJVMArgsProperty() {
         return noJVMArgsProperty;
     }
 
@@ -270,9 +307,26 @@ public final class VersionSetting {
         noJVMArgsProperty.set(noJVMArgs);
     }
 
-    private final ImmediateBooleanProperty notCheckGameProperty = new ImmediateBooleanProperty(this, "notCheckGame", false);
+    private final BooleanProperty notCheckJVMProperty = new SimpleBooleanProperty(this, "notCheckJVM", false);
 
-    public ImmediateBooleanProperty notCheckGameProperty() {
+    public BooleanProperty notCheckJVMProperty() {
+        return notCheckJVMProperty;
+    }
+
+    /**
+     * True if HMCL does not check JVM validity.
+     */
+    public boolean isNotCheckJVM() {
+        return notCheckJVMProperty.get();
+    }
+
+    public void setNotCheckJVM(boolean notCheckJVM) {
+        notCheckJVMProperty.set(notCheckJVM);
+    }
+
+    private final BooleanProperty notCheckGameProperty = new SimpleBooleanProperty(this, "notCheckGame", false);
+
+    public BooleanProperty notCheckGameProperty() {
         return notCheckGameProperty;
     }
 
@@ -287,9 +341,9 @@ public final class VersionSetting {
         notCheckGameProperty.set(notCheckGame);
     }
 
-    private final ImmediateBooleanProperty showLogsProperty = new ImmediateBooleanProperty(this, "showLogs", false);
+    private final BooleanProperty showLogsProperty = new SimpleBooleanProperty(this, "showLogs", false);
 
-    public ImmediateBooleanProperty showLogsProperty() {
+    public BooleanProperty showLogsProperty() {
         return showLogsProperty;
     }
 
@@ -306,15 +360,15 @@ public final class VersionSetting {
 
     // Minecraft settings.
 
-    private final ImmediateStringProperty serverIpProperty = new ImmediateStringProperty(this, "serverIp", "");
+    private final StringProperty serverIpProperty = new SimpleStringProperty(this, "serverIp", "");
 
-    public ImmediateStringProperty serverIpProperty() {
+    public StringProperty serverIpProperty() {
         return serverIpProperty;
     }
 
     /**
-     * The server ip that will be entered after Minecraft successfully loaded immediately.
-     *
+     * The server ip that will be entered after Minecraft successfully loaded ly.
+     * <p>
      * Format: ip:port or without port.
      */
     public String getServerIp() {
@@ -326,9 +380,9 @@ public final class VersionSetting {
     }
 
 
-    private final ImmediateBooleanProperty fullscreenProperty = new ImmediateBooleanProperty(this, "fullscreen", false);
+    private final BooleanProperty fullscreenProperty = new SimpleBooleanProperty(this, "fullscreen", false);
 
-    public ImmediateBooleanProperty fullscreenProperty() {
+    public BooleanProperty fullscreenProperty() {
         return fullscreenProperty;
     }
 
@@ -343,15 +397,15 @@ public final class VersionSetting {
         fullscreenProperty.set(fullscreen);
     }
 
-    private final ImmediateIntegerProperty widthProperty = new ImmediateIntegerProperty(this, "width", 854);
+    private final IntegerProperty widthProperty = new SimpleIntegerProperty(this, "width", 854);
 
-    public ImmediateIntegerProperty widthProperty() {
+    public IntegerProperty widthProperty() {
         return widthProperty;
     }
 
     /**
      * The width of Minecraft window, defaults 800.
-     *
+     * <p>
      * The field saves int value.
      * String type prevents unexpected value from JsonParseException.
      * We can only reset this field instead of recreating the whole setting file.
@@ -365,15 +419,15 @@ public final class VersionSetting {
     }
 
 
-    private final ImmediateIntegerProperty heightProperty = new ImmediateIntegerProperty(this, "height", 480);
+    private final IntegerProperty heightProperty = new SimpleIntegerProperty(this, "height", 480);
 
-    public ImmediateIntegerProperty heightProperty() {
+    public IntegerProperty heightProperty() {
         return heightProperty;
     }
 
     /**
      * The height of Minecraft window, defaults 480.
-     *
+     * <p>
      * The field saves int value.
      * String type prevents unexpected value from JsonParseException.
      * We can only reset this field instead of recreating the whole setting file.
@@ -390,26 +444,26 @@ public final class VersionSetting {
      * 0 - .minecraft<br/>
      * 1 - .minecraft/versions/&lt;version&gt;/<br/>
      */
-    private final ImmediateObjectProperty<EnumGameDirectory> gameDirTypeProperty = new ImmediateObjectProperty<>(this, "gameDirType", EnumGameDirectory.ROOT_FOLDER);
+    private final ObjectProperty<GameDirectoryType> gameDirTypeProperty = new SimpleObjectProperty<>(this, "gameDirType", GameDirectoryType.ROOT_FOLDER);
 
-    public ImmediateObjectProperty<EnumGameDirectory> gameDirTypeProperty() {
+    public ObjectProperty<GameDirectoryType> gameDirTypeProperty() {
         return gameDirTypeProperty;
     }
 
-    public EnumGameDirectory getGameDirType() {
+    public GameDirectoryType getGameDirType() {
         return gameDirTypeProperty.get();
     }
 
-    public void setGameDirType(EnumGameDirectory gameDirType) {
+    public void setGameDirType(GameDirectoryType gameDirType) {
         gameDirTypeProperty.set(gameDirType);
     }
 
     /**
      * Your custom gameDir
      */
-    private final ImmediateStringProperty gameDirProperty = new ImmediateStringProperty(this, "gameDir", "");
+    private final StringProperty gameDirProperty = new SimpleStringProperty(this, "gameDir", "");
 
-    public ImmediateStringProperty gameDirProperty() {
+    public StringProperty gameDirProperty() {
         return gameDirProperty;
     }
 
@@ -428,9 +482,9 @@ public final class VersionSetting {
      * 1 - Hide the launcher when the game starts.<br/>
      * 2 - Keep the launcher open.<br/>
      */
-    private final ImmediateObjectProperty<LauncherVisibility> launcherVisibilityProperty = new ImmediateObjectProperty<>(this, "launcherVisibility", LauncherVisibility.HIDE);
+    private final ObjectProperty<LauncherVisibility> launcherVisibilityProperty = new SimpleObjectProperty<>(this, "launcherVisibility", LauncherVisibility.HIDE);
 
-    public ImmediateObjectProperty<LauncherVisibility> launcherVisibilityProperty() {
+    public ObjectProperty<LauncherVisibility> launcherVisibilityProperty() {
         return launcherVisibilityProperty;
     }
 
@@ -443,18 +497,25 @@ public final class VersionSetting {
     }
 
     public JavaVersion getJavaVersion() throws InterruptedException {
+        return getJavaVersion(true);
+    }
+
+    public JavaVersion getJavaVersion(boolean checkJava) throws InterruptedException {
         // TODO: lazy initialization may result in UI suspension.
         if (StringUtils.isBlank(getJava()))
             setJava(StringUtils.isBlank(getJavaDir()) ? "Default" : "Custom");
         if ("Default".equals(getJava())) return JavaVersion.fromCurrentEnvironment();
         else if (isUsesCustomJavaDir()) {
             try {
-                return JavaVersion.fromExecutable(new File(getJavaDir()));
-            } catch (IOException e) {
+                if (checkJava)
+                    return JavaVersion.fromExecutable(Paths.get(getJavaDir()));
+                else
+                    return new JavaVersion(Paths.get(getJavaDir()), "", Platform.PLATFORM);
+            } catch (IOException | InvalidPathException e) {
                 return null; // Custom Java Directory not found,
             }
         } else if (StringUtils.isNotBlank(getJava())) {
-            List<JavaVersion> matchedJava = JavaVersion.getJREs().stream()
+            List<JavaVersion> matchedJava = JavaVersion.getJavas().stream()
                     .filter(java -> java.getVersion().equals(getJava()))
                     .collect(Collectors.toList());
             if (matchedJava.isEmpty()) {
@@ -487,6 +548,7 @@ public final class VersionSetting {
         minecraftArgsProperty.addListener(listener);
         noJVMArgsProperty.addListener(listener);
         notCheckGameProperty.addListener(listener);
+        notCheckJVMProperty.addListener(listener);
         showLogsProperty.addListener(listener);
         serverIpProperty.addListener(listener);
         fullscreenProperty.addListener(listener);
@@ -496,40 +558,40 @@ public final class VersionSetting {
         gameDirProperty.addListener(listener);
         launcherVisibilityProperty.addListener(listener);
         defaultJavaPathProperty.addListener(listener);
+        nativesDirProperty.addListener(listener);
+        nativesDirTypeProperty.addListener(listener);
     }
 
-    public LaunchOptions toLaunchOptions(File gameDir) throws InterruptedException {
-        JavaVersion javaVersion = Optional.ofNullable(getJavaVersion()).orElse(JavaVersion.fromCurrentEnvironment());
-        return new LaunchOptions.Builder()
-                .setGameDir(gameDir)
-                .setJava(javaVersion)
-                .setVersionName(Launcher.TITLE)
-                .setProfileName(Launcher.TITLE)
-                .setMinecraftArgs(getMinecraftArgs())
-                .setJavaArgs(getJavaArgs())
-                .setMaxMemory(getMaxMemory())
-                .setMinMemory(getMinMemory())
-                .setMetaspace(Lang.toIntOrNull(getPermSize()))
-                .setWidth(getWidth())
-                .setHeight(getHeight())
-                .setFullscreen(isFullscreen())
-                .setServerIp(getServerIp())
-                .setWrapper(getWrapper())
-                .setProxyHost(CONFIG.getProxyHost())
-                .setProxyPort(CONFIG.getProxyPort())
-                .setProxyUser(CONFIG.getProxyUser())
-                .setProxyPass(CONFIG.getProxyPass())
-                .setPrecalledCommand(getPreLaunchCommand())
-                .setNoGeneratedJVMArgs(isNoJVMArgs())
-                .create();
+    @Override
+    public VersionSetting clone() {
+        VersionSetting versionSetting = new VersionSetting();
+        versionSetting.setUsesGlobal(isUsesGlobal());
+        versionSetting.setJava(getJava());
+        versionSetting.setDefaultJavaPath(getDefaultJavaPath());
+        versionSetting.setJavaDir(getJavaDir());
+        versionSetting.setWrapper(getWrapper());
+        versionSetting.setPermSize(getPermSize());
+        versionSetting.setMaxMemory(getMaxMemory());
+        versionSetting.setMinMemory(getMinMemory());
+        versionSetting.setPreLaunchCommand(getPreLaunchCommand());
+        versionSetting.setJavaArgs(getJavaArgs());
+        versionSetting.setMinecraftArgs(getMinecraftArgs());
+        versionSetting.setNoJVMArgs(isNoJVMArgs());
+        versionSetting.setNotCheckGame(isNotCheckGame());
+        versionSetting.setNotCheckJVM(isNotCheckJVM());
+        versionSetting.setShowLogs(isShowLogs());
+        versionSetting.setServerIp(getServerIp());
+        versionSetting.setFullscreen(isFullscreen());
+        versionSetting.setWidth(getWidth());
+        versionSetting.setHeight(getHeight());
+        versionSetting.setGameDirType(getGameDirType());
+        versionSetting.setGameDir(getGameDir());
+        versionSetting.setLauncherVisibility(getLauncherVisibility());
+        versionSetting.setNativesDir(getNativesDir());
+        return versionSetting;
     }
 
     public static class Serializer implements JsonSerializer<VersionSetting>, JsonDeserializer<VersionSetting> {
-        public static final Serializer INSTANCE = new Serializer();
-
-        private Serializer() {
-        }
-
         @Override
         public JsonElement serialize(VersionSetting src, Type typeOfSrc, JsonSerializationContext context) {
             if (src == null) return JsonNull.INSTANCE;
@@ -551,18 +613,21 @@ public final class VersionSetting {
             obj.addProperty("fullscreen", src.isFullscreen());
             obj.addProperty("noJVMArgs", src.isNoJVMArgs());
             obj.addProperty("notCheckGame", src.isNotCheckGame());
+            obj.addProperty("notCheckJVM", src.isNotCheckJVM());
             obj.addProperty("showLogs", src.isShowLogs());
             obj.addProperty("gameDir", src.getGameDir());
             obj.addProperty("launcherVisibility", src.getLauncherVisibility().ordinal());
             obj.addProperty("gameDirType", src.getGameDirType().ordinal());
             obj.addProperty("defaultJavaPath", src.getDefaultJavaPath());
+            obj.addProperty("nativesDir", src.getNativesDir());
+            obj.addProperty("nativesDirType", src.getNativesDirType().ordinal());
 
             return obj;
         }
 
         @Override
         public VersionSetting deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
-            if (json == null || json == JsonNull.INSTANCE || !(json instanceof JsonObject))
+            if (json == JsonNull.INSTANCE || !(json instanceof JsonObject))
                 return null;
             JsonObject obj = (JsonObject) json;
 
@@ -585,13 +650,16 @@ public final class VersionSetting {
             vs.setJava(Optional.ofNullable(obj.get("java")).map(JsonElement::getAsString).orElse(""));
             vs.setWrapper(Optional.ofNullable(obj.get("wrapper")).map(JsonElement::getAsString).orElse(""));
             vs.setGameDir(Optional.ofNullable(obj.get("gameDir")).map(JsonElement::getAsString).orElse(""));
+            vs.setNativesDir(Optional.ofNullable(obj.get("nativesDir")).map(JsonElement::getAsString).orElse(""));
             vs.setFullscreen(Optional.ofNullable(obj.get("fullscreen")).map(JsonElement::getAsBoolean).orElse(false));
             vs.setNoJVMArgs(Optional.ofNullable(obj.get("noJVMArgs")).map(JsonElement::getAsBoolean).orElse(false));
             vs.setNotCheckGame(Optional.ofNullable(obj.get("notCheckGame")).map(JsonElement::getAsBoolean).orElse(false));
+            vs.setNotCheckJVM(Optional.ofNullable(obj.get("notCheckJVM")).map(JsonElement::getAsBoolean).orElse(false));
             vs.setShowLogs(Optional.ofNullable(obj.get("showLogs")).map(JsonElement::getAsBoolean).orElse(false));
             vs.setLauncherVisibility(LauncherVisibility.values()[Optional.ofNullable(obj.get("launcherVisibility")).map(JsonElement::getAsInt).orElse(1)]);
-            vs.setGameDirType(EnumGameDirectory.values()[Optional.ofNullable(obj.get("gameDirType")).map(JsonElement::getAsInt).orElse(0)]);
+            vs.setGameDirType(GameDirectoryType.values()[Optional.ofNullable(obj.get("gameDirType")).map(JsonElement::getAsInt).orElse(0)]);
             vs.setDefaultJavaPath(Optional.ofNullable(obj.get("defaultJavaPath")).map(JsonElement::getAsString).orElse(null));
+            vs.setNativesDirType(NativesDirectoryType.values()[Optional.ofNullable(obj.get("nativesDirType")).map(JsonElement::getAsInt).orElse(0)]);
 
             return vs;
         }
@@ -601,7 +669,9 @@ public final class VersionSetting {
         }
 
         private int parseJsonPrimitive(JsonPrimitive primitive, int defaultValue) {
-            if (primitive.isNumber())
+            if (primitive == null)
+                return defaultValue;
+            else if (primitive.isNumber())
                 return primitive.getAsInt();
             else
                 return Lang.parseInt(primitive.getAsString(), defaultValue);

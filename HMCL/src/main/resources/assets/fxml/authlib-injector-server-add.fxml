@@ -1,38 +1,30 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import java.lang.String?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <?import com.jfoenix.controls.*?>
-<?import org.jackhuang.hmcl.ui.construct.URLValidator?>
 <?import org.jackhuang.hmcl.ui.construct.SpinnerPane?>
 
+<?import org.jackhuang.hmcl.ui.animation.TransitionPane?>
 <fx:root xmlns="http://javafx.com/javafx"
          xmlns:fx="http://javafx.com/fxml"
          type="StackPane">
-    <StackPane fx:id="addServerContainer">
+    <TransitionPane fx:id="root">
         <JFXDialogLayout fx:id="addServerPane">
             <heading>
                 <Label text="%account.injector.add" />
             </heading>
             <body>
-                <JFXTextField fx:id="txtServerUrl" promptText="%account.injector.server_url" onAction="#onAddNext">
-                    <validators>
-                        <URLValidator message="%input.url">
-                            <protocols>
-                                <String fx:value="http" />
-                                <String fx:value="https" />
-                            </protocols>
-                        </URLValidator>
-                    </validators>
-                </JFXTextField>
+                <JFXTextField fx:id="txtServerUrl" promptText="%account.injector.server_url" onAction="#onAddNext" />
             </body>
             <actions>
                 <Label fx:id="lblCreationWarning" />
-                <JFXButton onMouseClicked="#onAddCancel" text="%button.cancel" styleClass="dialog-cancel" />
-                <SpinnerPane fx:id="nextPane" styleClass="small-spinner-pane">
-                    <JFXButton fx:id="btnAddNext"  onMouseClicked="#onAddNext" text="%wizard.next" styleClass="dialog-accept" />
-                </SpinnerPane>
+                <HBox>
+                    <JFXButton onMouseClicked="#onAddCancel" text="%button.cancel" styleClass="dialog-cancel" />
+                    <SpinnerPane fx:id="nextPane" styleClass="small-spinner-pane">
+                        <JFXButton fx:id="btnAddNext"  onMouseClicked="#onAddNext" text="%wizard.next" styleClass="dialog-accept" />
+                    </SpinnerPane>
+                </HBox>
             </actions>
         </JFXDialogLayout>
 
@@ -60,5 +52,5 @@
                 <JFXButton onMouseClicked="#onAddFinish" text="%wizard.finish" styleClass="dialog-accept" />
             </actions>
         </JFXDialogLayout>
-    </StackPane>
+    </TransitionPane>
 </fx:root>

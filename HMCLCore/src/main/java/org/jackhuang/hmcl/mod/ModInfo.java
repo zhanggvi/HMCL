@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,17 +13,23 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.mod;
 
-import org.jackhuang.hmcl.util.FileUtils;
-import org.jackhuang.hmcl.util.ImmediateBooleanProperty;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
 import org.jackhuang.hmcl.util.Logging;
 import org.jackhuang.hmcl.util.StringUtils;
+import org.jackhuang.hmcl.util.io.FileUtils;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
+import java.util.logging.Level;
 
 /**
  *
@@ -31,26 +37,22 @@ import java.util.Objects;
  */
 public final class ModInfo implements Comparable<ModInfo> {
 
-    private File file;
+    private Path file;
     private final String name;
-    private final String description;
+    private final Description description;
     private final String authors;
     private final String version;
     private final String gameVersion;
     private final String url;
     private final String fileName;
-    private final ImmediateBooleanProperty activeProperty;
+    private final BooleanProperty activeProperty;
 
-    public ModInfo(File file, String name) {
-        this(file, name, "");
+    public ModInfo(ModManager modManager, File file, String name, Description description) {
+        this(modManager, file, name, description, "", "", "", "");
     }
 
-    public ModInfo(File file, String name, String description) {
-        this(file, name, description, "unknown", "unknown", "unknown", "");
-    }
-
-    public ModInfo(File file, String name, String description, String authors, String version, String gameVersion, String url) {
-        this.file = file;
+    public ModInfo(ModManager modManager, File file, String name, Description description, String authors, String version, String gameVersion, String url) {
+        this.file = file.toPath();
         this.name = name;
         this.description = description;
         this.authors = authors;
@@ -58,26 +60,26 @@ public final class ModInfo implements Comparable<ModInfo> {
         this.gameVersion = gameVersion;
         this.url = url;
 
-        activeProperty = new ImmediateBooleanProperty(this, "active", !DISABLED_EXTENSION.equals(FileUtils.getExtension(file))) {
+        activeProperty = new SimpleBooleanProperty(this, "active", !modManager.isDisabled(file)) {
             @Override
             protected void invalidated() {
-                File f = ModInfo.this.file.getAbsoluteFile(), newF;
-                if (DISABLED_EXTENSION.equals(FileUtils.getExtension(f)))
-                    newF = new File(f.getParentFile(), FileUtils.getNameWithoutExtension(f));
-                else
-                    newF = new File(f.getParentFile(), f.getName() + ".disabled");
+                Path path = ModInfo.this.file.toAbsolutePath();
 
-                if (f.renameTo(newF))
-                    ModInfo.this.file = newF;
-                else
-                    Logging.LOG.severe("Unable to rename file " + f + " to " + newF);
+                try {
+                    if (get())
+                        ModInfo.this.file = modManager.enableMod(path);
+                    else
+                        ModInfo.this.file = modManager.disableMod(path);
+                } catch (IOException e) {
+                    Logging.LOG.log(Level.SEVERE, "Unable to invert state of mod file " + path, e);
+                }
             }
         };
 
         fileName = StringUtils.substringBeforeLast(isActive() ? file.getName() : FileUtils.getNameWithoutExtension(file), '.');
     }
 
-    public File getFile() {
+    public Path getFile() {
         return file;
     }
 
@@ -85,7 +87,7 @@ public final class ModInfo implements Comparable<ModInfo> {
         return name;
     }
 
-    public String getDescription() {
+    public Description getDescription() {
         return description;
     }
 
@@ -105,7 +107,7 @@ public final class ModInfo implements Comparable<ModInfo> {
         return url;
     }
 
-    public ImmediateBooleanProperty activeProperty() {
+    public BooleanProperty activeProperty() {
         return activeProperty;
     }
 
@@ -136,41 +138,51 @@ public final class ModInfo implements Comparable<ModInfo> {
         return Objects.hash(getFileName());
     }
 
-    public static boolean isFileMod(File file) {
-        String name = file.getName();
-        if (isDisabled(file))
-            name = FileUtils.getNameWithoutExtension(file);
-        return name.endsWith(".zip") || name.endsWith(".jar") || name.endsWith(".litemod");
-    }
+    public static class Description {
+        private final List<Part> parts;
 
-    public static ModInfo fromFile(File modFile) {
-        File file = isDisabled(modFile) ? new File(modFile.getAbsoluteFile().getParentFile(), FileUtils.getNameWithoutExtension(modFile)) : modFile;
-        String description, extension = FileUtils.getExtension(file);
-        switch (extension) {
-            case "zip":
-            case "jar":
-                try {
-                    return ForgeModMetadata.fromFile(modFile);
-                } catch (Exception ignore) {
-                    description = "May be Forge mod";
-                }
-                break;
-            case "litemod":
-                try {
-                    return LiteModMetadata.fromFile(modFile);
-                } catch (Exception ignore) {
-                    description = "May be LiteLoader mod";
-                }
-                break;
-            default:
-                throw new IllegalArgumentException("File " + modFile + " is not a mod file.");
+        public Description(String text) {
+            this.parts = new ArrayList<>();
+            this.parts.add(new Part(text, "black"));
         }
-        return new ModInfo(modFile, FileUtils.getNameWithoutExtension(modFile), description);
-    }
 
-    public static boolean isDisabled(File file) {
-        return DISABLED_EXTENSION.equals(FileUtils.getExtension(file));
-    }
+        public Description(List<Part> parts) {
+            this.parts = parts;
+        }
 
-    public static final String DISABLED_EXTENSION = "disabled";
+        public List<Part> getParts() {
+            return parts;
+        }
+
+        @Override
+        public String toString() {
+            StringBuilder builder = new StringBuilder();
+            for (Part part : parts) {
+                builder.append(part.text);
+            }
+            return builder.toString();
+        }
+
+        public static class Part {
+            private final String text;
+            private final String color;
+
+            public Part(String text) {
+                this(text, "");
+            }
+
+            public Part(String text, String color) {
+                this.text = Objects.requireNonNull(text);
+                this.color = Objects.requireNonNull(color);
+            }
+
+            public String getText() {
+                return text;
+            }
+
+            public String getColor() {
+                return color;
+            }
+        }
+    }
 }

@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,87 +13,59 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.ui.download;
 
-import com.jfoenix.controls.JFXButton;
-import javafx.fxml.FXML;
-import javafx.scene.control.Label;
-import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
-
-import org.jackhuang.hmcl.download.DownloadProvider;
+import javafx.beans.binding.Bindings;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import org.jackhuang.hmcl.download.LibraryAnalyzer;
 import org.jackhuang.hmcl.download.RemoteVersion;
 import org.jackhuang.hmcl.game.GameRepository;
-import org.jackhuang.hmcl.ui.FXUtils;
+import org.jackhuang.hmcl.game.Version;
+import org.jackhuang.hmcl.ui.InstallerItem;
 import org.jackhuang.hmcl.ui.wizard.WizardController;
-import org.jackhuang.hmcl.ui.wizard.WizardPage;
 import org.jackhuang.hmcl.util.Lang;
-import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
 
 import java.util.Map;
 import java.util.Optional;
 
-class AdditionalInstallersPage extends StackPane implements WizardPage {
-    private final InstallerWizardProvider provider;
-    private final WizardController controller;
+import static org.jackhuang.hmcl.download.LibraryAnalyzer.LibraryType.*;
+import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
 
-    @FXML
-    private VBox list;
-    @FXML
-    private JFXButton btnForge;
-    @FXML
-    private JFXButton btnLiteLoader;
-    @FXML
-    private JFXButton btnOptiFine;
-    @FXML
-    private Label lblGameVersion;
-    @FXML
-    private Label lblVersionName;
-    @FXML
-    private Label lblForge;
-    @FXML
-    private Label lblLiteLoader;
-    @FXML
-    private Label lblOptiFine;
-    @FXML
-    private JFXButton btnInstall;
+class AdditionalInstallersPage extends InstallersPage {
+    protected final BooleanProperty compatible = new SimpleBooleanProperty();
+    protected final GameRepository repository;
+    protected final String gameVersion;
+    protected final Version version;
 
-    public AdditionalInstallersPage(InstallerWizardProvider provider, WizardController controller, GameRepository repository, DownloadProvider downloadProvider) {
-        this.provider = provider;
-        this.controller = controller;
+    public AdditionalInstallersPage(String gameVersion, Version version, WizardController controller, GameRepository repository, InstallerWizardDownloadProvider downloadProvider) {
+        super(controller, repository, gameVersion, downloadProvider);
+        this.gameVersion = gameVersion;
+        this.version = version;
+        this.repository = repository;
 
-        FXUtils.loadFXML(this, "/assets/fxml/download/additional-installers.fxml");
+        txtName.getValidators().clear();
+        txtName.setText(version.getId());
+        txtName.setEditable(false);
 
-        lblGameVersion.setText(provider.getGameVersion());
-        lblVersionName.setText(provider.getVersion().getId());
+        installable.bind(Bindings.createBooleanBinding(
+                () -> compatible.get() && txtName.validate(),
+                txtName.textProperty(), compatible));
 
-        btnForge.setOnMouseClicked(e -> {
-            controller.getSettings().put(INSTALLER_TYPE, 0);
-            controller.onNext(new VersionsPage(controller, i18n("install.installer.choose", i18n("install.installer.forge")), provider.getGameVersion(), downloadProvider, "forge", () -> {
-                controller.onPrev(false);
-            }));
-        });
-
-        btnLiteLoader.setOnMouseClicked(e -> {
-            controller.getSettings().put(INSTALLER_TYPE, 1);
-            controller.onNext(new VersionsPage(controller, i18n("install.installer.choose", i18n("install.installer.liteloader")), provider.getGameVersion(), downloadProvider, "liteloader", () -> {
-                controller.onPrev(false);
-            }));
-        });
-
-        btnOptiFine.setOnMouseClicked(e -> {
-            controller.getSettings().put(INSTALLER_TYPE, 2);
-            controller.onNext(new VersionsPage(controller, i18n("install.installer.choose", i18n("install.installer.optifine")), provider.getGameVersion(), downloadProvider, "optifine", () -> {
-                controller.onPrev(false);
-            }));
-        });
-
-        btnInstall.setOnMouseClicked(e -> onInstall());
+        for (InstallerItem library : group.getLibraries()) {
+            String libraryId = library.getLibraryId();
+            if (libraryId.equals("game")) continue;
+            library.removeAction.set(e -> {
+                controller.getSettings().put(libraryId, new UpdateInstallerWizardProvider.RemoveVersionAction(libraryId));
+                reload();
+            });
+        }
     }
 
-    private void onInstall() {
+    @Override
+    protected void onInstall() {
         controller.onFinish();
     }
 
@@ -103,36 +75,45 @@ class AdditionalInstallersPage extends StackPane implements WizardPage {
     }
 
     private String getVersion(String id) {
-        return Optional.ofNullable(controller.getSettings().get(id)).map(it -> (RemoteVersion<?>) it).map(RemoteVersion::getSelfVersion).orElse(null);
+        return Optional.ofNullable(controller.getSettings().get(id))
+                .flatMap(it -> Lang.tryCast(it, RemoteVersion.class))
+                .map(RemoteVersion::getSelfVersion).orElse(null);
     }
 
     @Override
-    public void onNavigate(Map<String, Object> settings) {
-        lblGameVersion.setText(i18n("install.new_game.current_game_version") + ": " + provider.getGameVersion());
-        btnForge.setDisable(provider.getForge() != null);
-        if (provider.getForge() != null || controller.getSettings().containsKey("forge"))
-            lblForge.setText(i18n("install.installer.version", i18n("install.installer.forge")) + ": " + Lang.nonNull(provider.getForge(), getVersion("forge")));
-        else
-            lblForge.setText(i18n("install.installer.not_installed", i18n("install.installer.forge")));
+    protected void reload() {
+        LibraryAnalyzer analyzer = LibraryAnalyzer.analyze(version.resolvePreservingPatches(repository));
+        String game = analyzer.getVersion(MINECRAFT).orElse(null);
+        String fabric = analyzer.getVersion(FABRIC).orElse(null);
+        String forge = analyzer.getVersion(FORGE).orElse(null);
+        String liteLoader = analyzer.getVersion(LITELOADER).orElse(null);
+        String optiFine = analyzer.getVersion(OPTIFINE).orElse(null);
 
-        btnLiteLoader.setDisable(provider.getLiteLoader() != null);
-        if (provider.getLiteLoader() != null || controller.getSettings().containsKey("liteloader"))
-            lblLiteLoader.setText(i18n("install.installer.version", i18n("install.installer.liteloader")) + ": " + Lang.nonNull(provider.getLiteLoader(), getVersion("liteloader")));
-        else
-            lblLiteLoader.setText(i18n("install.installer.not_installed", i18n("install.installer.liteloader")));
+        InstallerItem[] libraries = group.getLibraries();
+        String[] versions = new String[]{game, fabric, forge, liteLoader, optiFine};
 
-        btnOptiFine.setDisable(provider.getOptiFine() != null);
-        if (provider.getOptiFine() != null || controller.getSettings().containsKey("optifine"))
-            lblOptiFine.setText(i18n("install.installer.version", i18n("install.installer.optifine")) + ": " + Lang.nonNull(provider.getOptiFine(), getVersion("optifine")));
-        else
-            lblOptiFine.setText(i18n("install.installer.not_installed", i18n("install.installer.optifine")));
+        String currentGameVersion = Lang.nonNull(getVersion("game"), game);
 
+        boolean compatible = true;
+        for (int i = 0; i < libraries.length; ++i) {
+            String libraryId = libraries[i].getLibraryId();
+            String libraryVersion = Lang.nonNull(getVersion(libraryId), versions[i]);
+            boolean alreadyInstalled = versions[i] != null && !(controller.getSettings().get(libraryId) instanceof UpdateInstallerWizardProvider.RemoveVersionAction);
+            if (!"game".equals(libraryId) && currentGameVersion != null && !currentGameVersion.equals(game) && getVersion(libraryId) == null && alreadyInstalled) {
+                // For third-party libraries, if game version is being changed, and the library is not being reinstalled,
+                // warns the user that we should update the library.
+                libraries[i].setState(libraryVersion, /* incompatibleWithGame */ true, /* removable */ true);
+                compatible = false;
+            } else if (alreadyInstalled || getVersion(libraryId) != null) {
+                libraries[i].setState(libraryVersion, /* incompatibleWithGame */ false, /* removable */ true);
+            } else {
+                libraries[i].setState(/* libraryVersion */ null, /* incompatibleWithGame */ false, /* removable */ false);
+            }
+        }
+        this.compatible.set(compatible);
     }
 
     @Override
     public void cleanup(Map<String, Object> settings) {
-        settings.remove(INSTALLER_TYPE);
     }
-
-    public static final String INSTALLER_TYPE = "INSTALLER_TYPE";
 }

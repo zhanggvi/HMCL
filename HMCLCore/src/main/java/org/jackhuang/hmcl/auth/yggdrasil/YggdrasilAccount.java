@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,36 +13,81 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.auth.yggdrasil;
 
-import org.jackhuang.hmcl.auth.*;
-import org.jackhuang.hmcl.util.StringUtils;
-import org.jackhuang.hmcl.util.UUIDTypeAdapter;
+import javafx.beans.binding.ObjectBinding;
+import org.jackhuang.hmcl.auth.Account;
+import org.jackhuang.hmcl.auth.AuthInfo;
+import org.jackhuang.hmcl.auth.AuthenticationException;
+import org.jackhuang.hmcl.auth.CharacterDeletedException;
+import org.jackhuang.hmcl.auth.CharacterSelector;
+import org.jackhuang.hmcl.auth.CredentialExpiredException;
+import org.jackhuang.hmcl.auth.NoCharacterException;
+import org.jackhuang.hmcl.auth.ServerResponseMalformedException;
+import org.jackhuang.hmcl.util.gson.UUIDTypeAdapter;
+import org.jackhuang.hmcl.util.javafx.BindingMapping;
 
+import java.nio.file.Path;
 import java.util.*;
+import java.util.logging.Level;
 
-/**
- *
- * @author huangyuhui
- */
+import static java.util.Objects.requireNonNull;
+import static org.jackhuang.hmcl.util.Logging.LOG;
+
 public class YggdrasilAccount extends Account {
 
-    private final String username;
-    private final YggdrasilService service;
-    private boolean isOnline = false;
+    protected final YggdrasilService service;
+    protected final UUID characterUUID;
+    protected final String username;
+
+    private boolean authenticated = false;
     private YggdrasilSession session;
-    private UUID characterUUID;
 
-    protected YggdrasilAccount(YggdrasilService service, String username, UUID characterUUID, YggdrasilSession session) {
-        this.service = service;
-        this.username = username;
-        this.session = session;
-        this.characterUUID = characterUUID;
+    protected YggdrasilAccount(YggdrasilService service, String username, YggdrasilSession session) {
+        this.service = requireNonNull(service);
+        this.username = requireNonNull(username);
+        this.characterUUID = requireNonNull(session.getSelectedProfile().getId());
+        this.session = requireNonNull(session);
 
-        if (session == null || session.getSelectedProfile() == null || StringUtils.isBlank(session.getAccessToken()))
-            this.session = null;
+        addProfilePropertiesListener();
+    }
+
+    protected YggdrasilAccount(YggdrasilService service, String username, String password, CharacterSelector selector) throws AuthenticationException {
+        this.service = requireNonNull(service);
+        this.username = requireNonNull(username);
+
+        YggdrasilSession acquiredSession = service.authenticate(username, password, randomClientToken());
+        if (acquiredSession.getSelectedProfile() == null) {
+            if (acquiredSession.getAvailableProfiles() == null || acquiredSession.getAvailableProfiles().isEmpty()) {
+                throw new NoCharacterException();
+            }
+
+            GameProfile characterToSelect = selector.select(service, acquiredSession.getAvailableProfiles());
+
+            session = service.refresh(
+                    acquiredSession.getAccessToken(),
+                    acquiredSession.getClientToken(),
+                    characterToSelect);
+            // response validity has been checked in refresh()
+        } else {
+            session = acquiredSession;
+        }
+
+        characterUUID = session.getSelectedProfile().getId();
+        authenticated = true;
+
+        addProfilePropertiesListener();
+    }
+
+    private ObjectBinding<Optional<CompleteGameProfile>> profilePropertiesBinding;
+    private void addProfilePropertiesListener() {
+        // binding() is thread-safe
+        // hold the binding so that it won't be garbage-collected
+        profilePropertiesBinding = service.getProfileRepository().binding(characterUUID, true);
+        // and it's safe to add a listener to an ObjectBinding which does not have any listener attached before (maybe tricky)
+        profilePropertiesBinding.addListener((a, b, c) -> this.invalidate());
     }
 
     @Override
@@ -55,22 +100,20 @@ public class YggdrasilAccount extends Account {
         return session.getSelectedProfile().getName();
     }
 
-    public boolean isLoggedIn() {
-        return session != null && StringUtils.isNotBlank(session.getAccessToken());
-    }
-
-    public boolean canPlayOnline() {
-        return isLoggedIn() && session.getSelectedProfile() != null && isOnline;
+    @Override
+    public UUID getUUID() {
+        return session.getSelectedProfile().getId();
     }
 
     @Override
-    public AuthInfo logIn() throws AuthenticationException {
-        if (!canPlayOnline()) {
+    public synchronized AuthInfo logIn() throws AuthenticationException {
+        if (!authenticated) {
             if (service.validate(session.getAccessToken(), session.getClientToken())) {
-                isOnline = true;
+                authenticated = true;
             } else {
+                YggdrasilSession acquiredSession;
                 try {
-                    updateSession(service.refresh(session.getAccessToken(), session.getClientToken(), null), new SpecificCharacterSelector(characterUUID));
+                    acquiredSession = service.refresh(session.getAccessToken(), session.getClientToken(), null);
                 } catch (RemoteAuthenticationException e) {
                     if ("ForbiddenOperationException".equals(e.getRemoteName())) {
                         throw new CredentialExpiredException(e);
@@ -78,95 +121,102 @@ public class YggdrasilAccount extends Account {
                         throw e;
                     }
                 }
+                if (acquiredSession.getSelectedProfile() == null ||
+                        !acquiredSession.getSelectedProfile().getId().equals(characterUUID)) {
+                    throw new ServerResponseMalformedException("Selected profile changed");
+                }
+
+                session = acquiredSession;
+
+                authenticated = true;
+                invalidate();
             }
         }
+
         return session.toAuthInfo();
     }
 
     @Override
-    public AuthInfo logInWithPassword(String password) throws AuthenticationException {
-        return logInWithPassword(password, new SpecificCharacterSelector(characterUUID));
-    }
+    public synchronized AuthInfo logInWithPassword(String password) throws AuthenticationException {
+        YggdrasilSession acquiredSession = service.authenticate(username, password, randomClientToken());
 
-    protected AuthInfo logInWithPassword(String password, CharacterSelector selector) throws AuthenticationException {
-        updateSession(service.authenticate(username, password, UUIDTypeAdapter.fromUUID(UUID.randomUUID())), selector);
-        return session.toAuthInfo();
-    }
-
-    /**
-     * Updates the current session. This method shall be invoked after authenticate/refresh operation.
-     * {@link #session} field shall be set only using this method. This method ensures {@link #session}
-     * has a profile selected.
-     *
-     * @param acquiredSession the session acquired by making an authenticate/refresh request
-     */
-    private void updateSession(YggdrasilSession acquiredSession, CharacterSelector selector) throws AuthenticationException {
         if (acquiredSession.getSelectedProfile() == null) {
-            if (acquiredSession.getAvailableProfiles() == null || acquiredSession.getAvailableProfiles().length == 0)
-                throw new NoCharacterException(this);
+            if (acquiredSession.getAvailableProfiles() == null || acquiredSession.getAvailableProfiles().isEmpty()) {
+                throw new CharacterDeletedException();
+            }
 
-            this.session = service.refresh(
+            GameProfile characterToSelect = acquiredSession.getAvailableProfiles().stream()
+                    .filter(charatcer -> charatcer.getId().equals(characterUUID))
+                    .findFirst()
+                    .orElseThrow(CharacterDeletedException::new);
+
+            session = service.refresh(
                     acquiredSession.getAccessToken(),
                     acquiredSession.getClientToken(),
-                    selector.select(this, Arrays.asList(acquiredSession.getAvailableProfiles())));
+                    characterToSelect);
+
         } else {
-            this.session = acquiredSession;
+            if (!acquiredSession.getSelectedProfile().getId().equals(characterUUID)) {
+                throw new CharacterDeletedException();
+            }
+            session = acquiredSession;
         }
 
-        this.characterUUID = this.session.getSelectedProfile().getId();
+        authenticated = true;
         invalidate();
+        return session.toAuthInfo();
     }
 
     @Override
     public Optional<AuthInfo> playOffline() {
-        if (isLoggedIn() && session.getSelectedProfile() != null && !canPlayOnline())
-            return Optional.of(session.toAuthInfo());
-
-        return Optional.empty();
+        return Optional.of(session.toAuthInfo());
     }
 
     @Override
     public Map<Object, Object> toStorage() {
-        if (session == null)
-            throw new IllegalStateException("No session is specified");
-
-        HashMap<Object, Object> storage = new HashMap<>();
-        storage.put("username", getUsername());
+        Map<Object, Object> storage = new HashMap<>();
+        storage.put("username", username);
         storage.putAll(session.toStorage());
+        service.getProfileRepository().getImmediately(characterUUID).ifPresent(profile ->
+                storage.put("profileProperties", profile.getProperties()));
         return storage;
     }
 
-    @Override
-    public UUID getUUID() {
-        if (session == null || session.getSelectedProfile() == null)
-            return null;
-        else
-            return session.getSelectedProfile().getId();
-    }
-
-    public Optional<Texture> getSkin() throws AuthenticationException {
-        return getSkin(session.getSelectedProfile());
-    }
-
-    public Optional<Texture> getSkin(GameProfile profile) throws AuthenticationException {
-        if (!service.getTextures(profile).isPresent()) {
-            profile = service.getCompleteGameProfile(profile.getId()).orElse(profile);
-        }
-
-        return service.getTextures(profile).map(map -> map.get(TextureType.SKIN));
+    public YggdrasilService getYggdrasilService() {
+        return service;
     }
 
     @Override
     public void clearCache() {
-        Optional.ofNullable(session)
-                .map(YggdrasilSession::getSelectedProfile)
-                .map(GameProfile::getProperties)
-                .ifPresent(it -> it.remove("textures"));
+        authenticated = false;
+        service.getProfileRepository().invalidate(characterUUID);
+    }
+
+    @Override
+    public ObjectBinding<Optional<Map<TextureType, Texture>>> getTextures() {
+        return BindingMapping.of(service.getProfileRepository().binding(getUUID()))
+                .map(profile -> profile.flatMap(it -> {
+                    try {
+                        return YggdrasilService.getTextures(it);
+                    } catch (ServerResponseMalformedException e) {
+                        LOG.log(Level.WARNING, "Failed to parse texture payload", e);
+                        return Optional.empty();
+                    }
+                }));
+
+    }
+
+    public void uploadSkin(String model, Path file) throws AuthenticationException, UnsupportedOperationException {
+        service.uploadSkin(characterUUID, session.getAccessToken(), model, file);
+    }
+
+    private static String randomClientToken() {
+        return UUIDTypeAdapter.fromUUID(UUID.randomUUID());
     }
 
     @Override
     public String toString() {
-        return "YggdrasilAccount[username=" + getUsername() + "]";
+        return "YggdrasilAccount[uuid=" + characterUUID + ", username=" + username + "]";
     }
 
     @Override
@@ -176,7 +226,8 @@ public class YggdrasilAccount extends Account {
 
     @Override
     public boolean equals(Object obj) {
-        if (!(obj instanceof YggdrasilAccount))
+        if (this == obj) return true;
+        if (obj == null || obj.getClass() != YggdrasilAccount.class)
             return false;
         YggdrasilAccount another = (YggdrasilAccount) obj;
         return characterUUID.equals(another.characterUUID);

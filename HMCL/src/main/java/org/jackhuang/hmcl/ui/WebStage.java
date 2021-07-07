@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,24 +13,57 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.ui;
 
+import com.jfoenix.controls.JFXProgressBar;
+import javafx.beans.binding.Bindings;
 import javafx.scene.Scene;
-import javafx.scene.image.Image;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.StackPane;
+import javafx.scene.web.WebEngine;
 import javafx.scene.web.WebView;
 import javafx.stage.Stage;
+import org.jackhuang.hmcl.Metadata;
 
-import static org.jackhuang.hmcl.setting.ConfigHolder.CONFIG;
+import static org.jackhuang.hmcl.setting.ConfigHolder.config;
+import static org.jackhuang.hmcl.ui.FXUtils.newImage;
 
 public class WebStage extends Stage {
-    private final WebView webView = new WebView();
+    protected final StackPane pane = new StackPane();
+    protected final JFXProgressBar progressBar = new JFXProgressBar();
+    protected final WebView webView = new WebView();
+    protected final WebEngine webEngine = webView.getEngine();
 
     public WebStage() {
-        setScene(new Scene(webView, 800, 480));
-        getScene().getStylesheets().addAll(CONFIG.getTheme().getStylesheets());
-        getIcons().add(new Image("/assets/img/icon.png"));
+        this(800, 480);
+    }
+
+    public WebStage(int width, int height) {
+        setScene(new Scene(pane, width, height));
+        getScene().getStylesheets().addAll(config().getTheme().getStylesheets());
+        getIcons().add(newImage("/assets/img/icon.png"));
+        webView.getEngine().setUserDataDirectory(Metadata.HMCL_DIRECTORY.toFile());
+        webView.setContextMenuEnabled(false);
+        progressBar.progressProperty().bind(webView.getEngine().getLoadWorker().progressProperty());
+
+        progressBar.visibleProperty().bind(Bindings.createBooleanBinding(() -> {
+            switch (webView.getEngine().getLoadWorker().getState()) {
+                case SUCCEEDED:
+                case FAILED:
+                case CANCELLED:
+                    return false;
+                default:
+                    return true;
+            }
+        }, webEngine.getLoadWorker().stateProperty()));
+
+        BorderPane borderPane = new BorderPane();
+        borderPane.setPickOnBounds(false);
+        borderPane.setTop(progressBar);
+        progressBar.prefWidthProperty().bind(borderPane.widthProperty());
+        pane.getChildren().setAll(webView, borderPane);
     }
 
     public WebView getWebView() {

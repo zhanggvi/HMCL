@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,12 +13,13 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.ui.wizard;
 
 import javafx.scene.Node;
 import org.jackhuang.hmcl.task.Task;
+import org.jackhuang.hmcl.util.Logging;
 
 import java.util.*;
 
@@ -27,6 +28,7 @@ public class WizardController implements Navigation {
     private WizardProvider provider = null;
     private final Map<String, Object> settings = new HashMap<>();
     private final Stack<Node> pages = new Stack<>();
+    private boolean stopped = false;
 
     public WizardController(WizardDisplayer displayer) {
         this.displayer = displayer;
@@ -59,10 +61,16 @@ public class WizardController implements Navigation {
         Node page = navigatingTo(0);
         pages.push(page);
 
+        if (stopped) { // navigatingTo may stop this wizard.
+            return;
+        }
+
         if (page instanceof WizardPage)
             ((WizardPage) page).onNavigate(settings);
 
         displayer.onStart();
+
+        Logging.LOG.info("Navigating to " + page + ", pages: " + pages);
         displayer.navigateTo(page, NavigationDirection.START);
     }
 
@@ -74,16 +82,26 @@ public class WizardController implements Navigation {
     public void onNext(Node page) {
         pages.push(page);
 
+        if (stopped) { // navigatingTo may stop this wizard.
+            return;
+        }
+
         if (page instanceof WizardPage)
             ((WizardPage) page).onNavigate(settings);
 
+        Logging.LOG.info("Navigating to " + page + ", pages: " + pages);
         displayer.navigateTo(page, NavigationDirection.NEXT);
     }
 
     @Override
     public void onPrev(boolean cleanUp) {
         if (!canPrev()) {
-            throw new IllegalStateException("Cannot go backward since this is the back page. Pages: " + pages);
+            if (provider.cancelIfCannotGoBack()) {
+                onCancel();
+                return;
+            } else {
+                throw new IllegalStateException("Cannot go backward since this is the back page. Pages: " + pages);
+            }
         }
 
         Node page = pages.pop();
@@ -94,6 +112,7 @@ public class WizardController implements Navigation {
         if (prevPage instanceof WizardPage)
             ((WizardPage) prevPage).onNavigate(settings);
 
+        Logging.LOG.info("Navigating to " + prevPage + ", pages: " + pages);
         displayer.navigateTo(prevPage, NavigationDirection.PREVIOUS);
     }
 
@@ -106,12 +125,13 @@ public class WizardController implements Navigation {
     public void onFinish() {
         Object result = provider.finish(settings);
         if (result instanceof Summary) displayer.navigateTo(((Summary) result).getComponent(), NavigationDirection.NEXT);
-        else if (result instanceof Task) displayer.handleTask(settings, ((Task) result));
+        else if (result instanceof Task<?>) displayer.handleTask(settings, ((Task<?>) result));
         else if (result != null) throw new IllegalStateException("Unrecognized wizard result: " + result);
     }
 
     @Override
     public void onEnd() {
+        stopped = true;
         settings.clear();
         pages.clear();
         displayer.onEnd();

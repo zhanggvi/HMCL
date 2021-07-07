@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,7 +13,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.download.forge;
 
@@ -21,33 +21,39 @@ import org.jackhuang.hmcl.download.DownloadProvider;
 import org.jackhuang.hmcl.download.VersionList;
 import org.jackhuang.hmcl.task.GetTask;
 import org.jackhuang.hmcl.task.Task;
-import org.jackhuang.hmcl.util.Constants;
-import org.jackhuang.hmcl.util.NetworkUtils;
 import org.jackhuang.hmcl.util.StringUtils;
-import org.jackhuang.hmcl.util.VersionNumber;
+import org.jackhuang.hmcl.util.gson.JsonUtils;
+import org.jackhuang.hmcl.util.io.NetworkUtils;
+import org.jackhuang.hmcl.util.versioning.VersionNumber;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Map;
 
 /**
  *
  * @author huangyuhui
  */
-public final class ForgeVersionList extends VersionList<Void> {
+public final class ForgeVersionList extends VersionList<ForgeRemoteVersion> {
+    private final DownloadProvider downloadProvider;
 
-    public static final ForgeVersionList INSTANCE = new ForgeVersionList();
-
-    private ForgeVersionList() {
+    public ForgeVersionList(DownloadProvider downloadProvider) {
+        this.downloadProvider = downloadProvider;
     }
 
     @Override
-    public Task refreshAsync(DownloadProvider downloadProvider) {
+    public boolean hasType() {
+        return false;
+    }
+
+    @Override
+    public Task<?> refreshAsync() {
         final GetTask task = new GetTask(NetworkUtils.toURL(downloadProvider.injectURL(FORGE_LIST)));
-        final List<Task> dependents = Collections.singletonList(task);
-        return new Task() {
+        return new Task<Void>() {
 
             @Override
-            public Collection<Task> getDependents() {
-                return dependents;
+            public Collection<Task<?>> getDependents() {
+                return Collections.singleton(task);
             }
 
             @Override
@@ -55,15 +61,13 @@ public final class ForgeVersionList extends VersionList<Void> {
                 lock.writeLock().lock();
 
                 try {
-                    ForgeVersionRoot root = Constants.GSON.fromJson(task.getResult(), ForgeVersionRoot.class);
+                    ForgeVersionRoot root = JsonUtils.GSON.fromJson(task.getResult(), ForgeVersionRoot.class);
                     if (root == null)
                         return;
                     versions.clear();
 
                     for (Map.Entry<String, int[]> entry : root.getGameVersions().entrySet()) {
-                        Optional<String> gameVersion = VersionNumber.parseVersion(entry.getKey());
-                        if (!gameVersion.isPresent())
-                            continue;
+                        String gameVersion = VersionNumber.normalize(entry.getKey());
                         for (int v : entry.getValue()) {
                             ForgeVersion version = root.getNumber().get(v);
                             if (version == null)
@@ -74,13 +78,13 @@ public final class ForgeVersionList extends VersionList<Void> {
                                     String classifier = version.getGameVersion() + "-" + version.getVersion()
                                             + (StringUtils.isNotBlank(version.getBranch()) ? "-" + version.getBranch() : "");
                                     String fileName = root.getArtifact() + "-" + classifier + "-" + file[1] + "." + file[0];
-                                    jar = downloadProvider.injectURL(root.getWebPath() + classifier + "/" + fileName);
+                                    jar = root.getWebPath() + classifier + "/" + fileName;
                                 }
 
                             if (jar == null)
                                 continue;
-                            versions.put(gameVersion.get(), new ForgeRemoteVersion(
-                                    version.getGameVersion(), version.getVersion(), jar
+                            versions.put(gameVersion, new ForgeRemoteVersion(
+                                    version.getGameVersion(), version.getVersion(), Collections.singletonList(jar)
                             ));
                         }
                     }

@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,7 +13,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.download;
 
@@ -31,14 +31,14 @@ public abstract class GameBuilder {
     protected String name = "";
     protected String gameVersion = "";
     protected final Map<String, String> toolVersions = new HashMap<>();
-    protected final Set<RemoteVersion<?>> remoteVersions = new HashSet<>();
+    protected final Set<RemoteVersion> remoteVersions = new HashSet<>();
 
     public String getName() {
         return name;
     }
 
     /**
-     * The new game version name, for .minecraft/<version name>.
+     * The new game version name, for .minecraft/&lt;version name&gt;.
      *
      * @param name the name of new game version.
      */
@@ -64,7 +64,7 @@ public abstract class GameBuilder {
         return this;
     }
 
-    public GameBuilder version(RemoteVersion<?> remoteVersion) {
+    public GameBuilder version(RemoteVersion remoteVersion) {
         remoteVersions.add(remoteVersion);
         return this;
     }
@@ -72,5 +72,5 @@ public abstract class GameBuilder {
     /**
      * @return the task that can build thw whole Minecraft environment
      */
-    public abstract Task buildAsync();
+    public abstract Task<?> buildAsync();
 }

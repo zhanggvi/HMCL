@@ -1,6 +1,6 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -13,34 +13,40 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.auth.authlibinjector;
 
 import org.jackhuang.hmcl.auth.AccountFactory;
 import org.jackhuang.hmcl.auth.AuthenticationException;
 import org.jackhuang.hmcl.auth.CharacterSelector;
-import org.jackhuang.hmcl.auth.yggdrasil.YggdrasilService;
+import org.jackhuang.hmcl.auth.yggdrasil.CompleteGameProfile;
+import org.jackhuang.hmcl.auth.yggdrasil.GameProfile;
 import org.jackhuang.hmcl.auth.yggdrasil.YggdrasilSession;
-import org.jackhuang.hmcl.util.ExceptionalSupplier;
+import org.jackhuang.hmcl.util.javafx.ObservableOptionalCache;
 
-import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.function.Function;
 
 import static org.jackhuang.hmcl.util.Lang.tryCast;
 
 public class AuthlibInjectorAccountFactory extends AccountFactory<AuthlibInjectorAccount> {
-    private ExceptionalSupplier<AuthlibInjectorArtifactInfo, ? extends IOException> authlibInjectorDownloader;
+    private AuthlibInjectorArtifactProvider downloader;
     private Function<String, AuthlibInjectorServer> serverLookup;
 
     /**
      * @param serverLookup a function that looks up {@link AuthlibInjectorServer} by url
      */
-    public AuthlibInjectorAccountFactory(ExceptionalSupplier<AuthlibInjectorArtifactInfo, ? extends IOException> authlibInjectorDownloader, Function<String, AuthlibInjectorServer> serverLookup) {
-        this.authlibInjectorDownloader = authlibInjectorDownloader;
+    public AuthlibInjectorAccountFactory(AuthlibInjectorArtifactProvider downloader, Function<String, AuthlibInjectorServer> serverLookup) {
+        this.downloader = downloader;
         this.serverLookup = serverLookup;
+    }
+
+    @Override
+    public AccountLoginType getLoginType() {
+        return AccountLoginType.USERNAME_PASSWORD;
     }
 
     @Override
@@ -51,10 +57,7 @@ public class AuthlibInjectorAccountFactory extends AccountFactory<AuthlibInjecto
 
         AuthlibInjectorServer server = (AuthlibInjectorServer) additionalData;
 
-        AuthlibInjectorAccount account = new AuthlibInjectorAccount(new YggdrasilService(new AuthlibInjectorProvider(server.getUrl())),
-                server, authlibInjectorDownloader, username, null, null);
-        account.logInWithPassword(password, selector);
-        return account;
+        return new AuthlibInjectorAccount(server, downloader, username, password, selector);
     }
 
     @Override
@@ -70,7 +73,16 @@ public class AuthlibInjectorAccountFactory extends AccountFactory<AuthlibInjecto
 
         AuthlibInjectorServer server = serverLookup.apply(apiRoot);
 
-        return new AuthlibInjectorAccount(new YggdrasilService(new AuthlibInjectorProvider(server.getUrl())),
-                server, authlibInjectorDownloader, username, session.getSelectedProfile().getId(), session);
+        tryCast(storage.get("profileProperties"), Map.class).ifPresent(
+                it -> {
+                    @SuppressWarnings("unchecked")
+                    Map<String, String> properties = it;
+                    GameProfile selected = session.getSelectedProfile();
+                    ObservableOptionalCache<UUID, CompleteGameProfile, AuthenticationException> profileRepository = server.getYggdrasilService().getProfileRepository();
+                    profileRepository.put(selected.getId(), new CompleteGameProfile(selected, properties));
+                    profileRepository.invalidate(selected.getId());
+                });
+
+        return new AuthlibInjectorAccount(server, downloader, username, session);
     }
 }

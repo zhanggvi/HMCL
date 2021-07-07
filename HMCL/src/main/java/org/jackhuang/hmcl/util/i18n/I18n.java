@@ -1,6 +1,6 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -13,34 +13,35 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.util.i18n;
 
-import static org.jackhuang.hmcl.util.Logging.LOG;
+import org.jackhuang.hmcl.setting.ConfigHolder;
+import org.jackhuang.hmcl.util.i18n.Locales.SupportedLocale;
 
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 import java.util.logging.Level;
 
-import org.jackhuang.hmcl.setting.Settings;
+import static org.jackhuang.hmcl.util.Logging.LOG;
 
 public final class I18n {
 
     private I18n() {}
 
-    private static ResourceBundle RESOURCE_BUNDLE = null;
-
-    static {
+    public static SupportedLocale getCurrentLocale() {
         try {
-            RESOURCE_BUNDLE = Settings.INSTANCE.getLocale().getResourceBundle();
-        } catch (Throwable e) {
-            LOG.log(Level.SEVERE, "Settings cannot be initialized", e);
+            return ConfigHolder.config().getLocalization();
+        } catch (IllegalStateException e) {
+            // e is thrown by ConfigHolder.config(), indicating the config hasn't been loaded
+            // fallback to use default locale
+            return Locales.DEFAULT;
         }
     }
 
     public static ResourceBundle getResourceBundle() {
-        return RESOURCE_BUNDLE == null ? Locales.DEFAULT.getResourceBundle() : RESOURCE_BUNDLE;
+        return getCurrentLocale().getResourceBundle();
     }
 
     public static String i18n(String key, Object... formatArgs) {
@@ -56,4 +57,12 @@ public final class I18n {
         }
     }
 
+    public static boolean hasKey(String key) {
+        try {
+            getResourceBundle().getString(key);
+            return true;
+        } catch (MissingResourceException e) {
+            return false;
+        }
+    }
 }

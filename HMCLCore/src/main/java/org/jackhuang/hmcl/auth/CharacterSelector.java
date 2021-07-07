@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,17 +13,18 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.auth;
 
 import org.jackhuang.hmcl.auth.yggdrasil.GameProfile;
+import org.jackhuang.hmcl.auth.yggdrasil.YggdrasilService;
 
 import java.util.List;
 
 /**
  * This interface is for your application to open a GUI for user to choose the character
- * when a having-multi-character yggdrasil account is being logging in..
+ * when a having-multi-character yggdrasil account is being logging in.
  */
 public interface CharacterSelector {
 
@@ -33,7 +34,6 @@ public interface CharacterSelector {
      * @throws NoSelectedCharacterException if cannot select any character may because user close the selection window or cancel the selection.
      * @return your choice of game profile.
      */
-    GameProfile select(Account account, List<GameProfile> names) throws NoSelectedCharacterException;
+    GameProfile select(YggdrasilService yggdrasilService, List<GameProfile> names) throws NoSelectedCharacterException;
 
-    CharacterSelector DEFAULT = (account, names) -> names.stream().findFirst().orElseThrow(() -> new NoSelectedCharacterException(account));
 }

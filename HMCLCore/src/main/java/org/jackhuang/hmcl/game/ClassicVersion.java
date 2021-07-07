@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,7 +13,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.game;
 
@@ -29,18 +29,18 @@ import java.util.Date;
 public class ClassicVersion extends Version {
 
     public ClassicVersion() {
-        super(true, "Classic", "${auth_player_name} ${auth_session} --workDir ${game_directory}",
-                null, "net.minecraft.client.Minecraft", null, null, null, null,
+        super(true, "Classic", null, null, "${auth_player_name} ${auth_session} --workDir ${game_directory}",
+                null, "net.minecraft.client.Minecraft", null, null, null, null, null, null,
                 Arrays.asList(new ClassicLibrary("lwjgl"), new ClassicLibrary("jinput"), new ClassicLibrary("lwjgl_util")),
-                null, null, null, ReleaseType.UNKNOWN, new Date(), new Date(), 0);
+                null, null, null, ReleaseType.UNKNOWN, new Date(), new Date(), 0, false, false, null);
     }
 
     private static class ClassicLibrary extends Library {
 
         public ClassicLibrary(String name) {
-            super("", "", "", null, null,
+            super(new Artifact("", "", ""), null,
                     new LibrariesDownloadInfo(new LibraryDownloadInfo("bin/" + name + ".jar"), null),
-                    null, null, null, null);
+                    null, null, null, null, null, null);
         }
     }
 

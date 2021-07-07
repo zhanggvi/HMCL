@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,7 +13,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.util;
 
@@ -24,7 +24,7 @@ import java.util.Objects;
  *
  * @author huangyuhui
  */
-public class Pair<K, V> implements Map.Entry<K, V> {
+public final class Pair<K, V> implements Map.Entry<K, V> {
 
     public static <K, V> Pair<K, V> pair(K key, V value) {
         return new Pair<>(key, value);
@@ -33,8 +33,7 @@ public class Pair<K, V> implements Map.Entry<K, V> {
     private K key;
     private V value;
 
-    @Deprecated
-    public Pair(K key, V value) {
+    private Pair(K key, V value) {
         this.key = key;
         this.value = value;
     }

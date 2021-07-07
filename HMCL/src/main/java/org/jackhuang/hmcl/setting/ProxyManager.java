@@ -1,6 +1,6 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -13,11 +13,14 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.setting;
 
-import static org.jackhuang.hmcl.setting.ConfigHolder.CONFIG;
+import javafx.beans.binding.Bindings;
+import javafx.beans.binding.ObjectBinding;
+import javafx.beans.value.ObservableObjectValue;
+import org.jackhuang.hmcl.util.StringUtils;
 
 import java.net.Authenticator;
 import java.net.InetSocketAddress;
@@ -25,31 +28,14 @@ import java.net.PasswordAuthentication;
 import java.net.Proxy;
 import java.net.Proxy.Type;
 
-import org.jackhuang.hmcl.util.Lang;
-import org.jackhuang.hmcl.util.StringUtils;
-
-import javafx.beans.binding.Bindings;
-import javafx.beans.binding.ObjectBinding;
-import javafx.beans.value.ObservableObjectValue;
+import static org.jackhuang.hmcl.setting.ConfigHolder.config;
+import static org.jackhuang.hmcl.util.Logging.LOG;
 
 public final class ProxyManager {
     private ProxyManager() {
     }
 
-    private static ObjectBinding<Proxy> proxyProperty = Bindings.createObjectBinding(
-            () -> {
-                String host = CONFIG.getProxyHost();
-                Integer port = Lang.toIntOrNull(CONFIG.getProxyPort());
-                if (!CONFIG.hasProxy() || StringUtils.isBlank(host) || port == null || CONFIG.getProxyType() == Proxy.Type.DIRECT) {
-                    return Proxy.NO_PROXY;
-                } else {
-                    return new Proxy(CONFIG.getProxyType(), new InetSocketAddress(host, port));
-                }
-            },
-            CONFIG.proxyTypeProperty(),
-            CONFIG.proxyHostProperty(),
-            CONFIG.proxyPortProperty(),
-            CONFIG.hasProxyProperty());
+    private static ObjectBinding<Proxy> proxyProperty;
 
     public static Proxy getProxy() {
         return proxyProperty.get();
@@ -60,17 +46,34 @@ public final class ProxyManager {
     }
 
     static void init() {
-        proxyProperty.addListener(observable -> updateSystemProxy());
+        proxyProperty = Bindings.createObjectBinding(
+                () -> {
+                    String host = config().getProxyHost();
+                    int port = config().getProxyPort();
+                    if (!config().hasProxy() || StringUtils.isBlank(host) || config().getProxyType() == Proxy.Type.DIRECT) {
+                        return Proxy.NO_PROXY;
+                    } else {
+                        if (port < 0 || port > 0xFFFF) {
+                            LOG.warning("Illegal proxy port: " + port);
+                            return Proxy.NO_PROXY;
+                        }
+                        return new Proxy(config().getProxyType(), new InetSocketAddress(host, port));
+                    }
+                },
+                config().proxyTypeProperty(),
+                config().proxyHostProperty(),
+                config().proxyPortProperty(),
+                config().hasProxyProperty());
 
+        proxyProperty.addListener(any -> updateSystemProxy());
         updateSystemProxy();
 
         Authenticator.setDefault(new Authenticator() {
-
             @Override
             protected PasswordAuthentication getPasswordAuthentication() {
-                if (CONFIG.hasProxyAuth()) {
-                    String username = CONFIG.getProxyUser();
-                    String password = CONFIG.getProxyPass();
+                if (config().hasProxyAuth()) {
+                    String username = config().getProxyUser();
+                    String password = config().getProxyPass();
                     if (username != null && password != null) {
                         return new PasswordAuthentication(username, password.toCharArray());
                     }

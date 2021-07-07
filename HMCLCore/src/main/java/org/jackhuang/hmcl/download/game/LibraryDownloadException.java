@@ -1,6 +1,6 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2017  huangyuhui <huanghongxun2008@126.com>
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -13,16 +13,17 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.download.game;
 
 import org.jackhuang.hmcl.game.Library;
+import org.jetbrains.annotations.NotNull;
 
 public class LibraryDownloadException extends Exception {
     private final Library library;
 
-    public LibraryDownloadException(Library library, Throwable cause) {
+    public LibraryDownloadException(Library library, @NotNull Throwable cause) {
         super("Unable to download library " + library, cause);
 
         this.library = library;

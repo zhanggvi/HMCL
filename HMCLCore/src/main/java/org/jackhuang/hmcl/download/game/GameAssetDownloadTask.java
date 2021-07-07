@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,105 +13,115 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.download.game;
 
+import com.google.gson.JsonParseException;
 import org.jackhuang.hmcl.download.AbstractDependencyManager;
+import org.jackhuang.hmcl.game.AssetIndex;
+import org.jackhuang.hmcl.game.AssetIndexInfo;
 import org.jackhuang.hmcl.game.AssetObject;
 import org.jackhuang.hmcl.game.Version;
 import org.jackhuang.hmcl.task.FileDownloadTask;
-import org.jackhuang.hmcl.task.FileDownloadTask.IntegrityCheck;
 import org.jackhuang.hmcl.task.Task;
-import org.jackhuang.hmcl.util.FileUtils;
+import org.jackhuang.hmcl.util.CacheRepository;
 import org.jackhuang.hmcl.util.Logging;
-import org.jackhuang.hmcl.util.NetworkUtils;
+import org.jackhuang.hmcl.util.gson.JsonUtils;
+import org.jackhuang.hmcl.util.io.FileUtils;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URL;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.logging.Level;
-
-import static org.jackhuang.hmcl.util.DigestUtils.digest;
-import static org.jackhuang.hmcl.util.Hex.encodeHex;
 
 /**
  *
  * @author huangyuhui
  */
-public final class GameAssetDownloadTask extends Task {
+public final class GameAssetDownloadTask extends Task<Void> {
     
     private final AbstractDependencyManager dependencyManager;
     private final Version version;
-    private final GameAssetRefreshTask refreshTask;
-    private final List<Task> dependents = new LinkedList<>();
-    private final List<Task> dependencies = new LinkedList<>();
+    private final AssetIndexInfo assetIndexInfo;
+    private final File assetIndexFile;
+    private final boolean integrityCheck;
+    private final List<Task<?>> dependents = new LinkedList<>();
+    private final List<Task<?>> dependencies = new LinkedList<>();
 
     /**
      * Constructor.
      *
      * @param dependencyManager the dependency manager that can provides {@link org.jackhuang.hmcl.game.GameRepository}
-     * @param version the <b>resolved</b> version
+     * @param version the game version
      */
-    public GameAssetDownloadTask(AbstractDependencyManager dependencyManager, Version version) {
+    public GameAssetDownloadTask(AbstractDependencyManager dependencyManager, Version version, boolean forceDownloadingIndex, boolean integrityCheck) {
         this.dependencyManager = dependencyManager;
-        this.version = version;
-        this.refreshTask = new GameAssetRefreshTask(dependencyManager, version);
-        this.dependents.add(refreshTask);
+        this.version = version.resolve(dependencyManager.getGameRepository());
+        this.assetIndexInfo = this.version.getAssetIndex();
+        this.assetIndexFile = dependencyManager.getGameRepository().getIndexFile(version.getId(), assetIndexInfo.getId());
+        this.integrityCheck = integrityCheck;
+
+        dependents.add(new GameAssetIndexDownloadTask(dependencyManager, this.version, forceDownloadingIndex));
     }
 
     @Override
-    public Collection<Task> getDependents() {
+    public Collection<Task<?>> getDependents() {
         return dependents;
     }
 
     @Override
-    public List<Task> getDependencies() {
+    public Collection<Task<?>> getDependencies() {
         return dependencies;
     }
-    
+
     @Override
     public void execute() throws Exception {
-        int size = refreshTask.getResult().size();
-        int downloaded = 0;
-        for (Map.Entry<File, AssetObject> entry : refreshTask.getResult()) {
-            if (Thread.interrupted())
+        AssetIndex index;
+        try {
+            index = JsonUtils.fromNonNullJson(FileUtils.readText(assetIndexFile), AssetIndex.class);
+        } catch (IOException | JsonParseException e) {
+            throw new GameAssetIndexDownloadTask.GameAssetIndexMalformedException();
+        }
+
+        int progress = 0;
+        for (AssetObject assetObject : index.getObjects().values()) {
+            if (isCancelled())
                 throw new InterruptedException();
 
-            File file = entry.getKey();
-            AssetObject assetObject = entry.getValue();
-            String url = dependencyManager.getDownloadProvider().getAssetBaseURL() + assetObject.getLocation();
-            if (!FileUtils.makeDirectory(file.getAbsoluteFile().getParentFile())) {
-                Logging.LOG.log(Level.SEVERE, "Unable to create new file " + file + ", because parent directory cannot be created");
-                continue;
-            }
-            if (file.isDirectory())
-                continue;
-            boolean flag = true;
+            File file = dependencyManager.getGameRepository().getAssetObject(version.getId(), assetIndexInfo.getId(), assetObject);
+            boolean download = !file.isFile();
             try {
-                // check the checksum of file to ensure that the file is not need to re-download.
-                if (file.exists()) {
-                    String sha1 = encodeHex(digest("SHA-1", FileUtils.readBytes(file)));
-                    if (sha1.equals(assetObject.getHash())) {
-                        ++downloaded;
-                        Logging.LOG.finest("File $file has been downloaded successfully, skipped downloading");
-                        updateProgress(downloaded, size);
-                        continue;
-                    }
-                }
+                if (!download && integrityCheck && !assetObject.validateChecksum(file.toPath(), true))
+                    download = true;
             } catch (IOException e) {
-                Logging.LOG.log(Level.WARNING, "Unable to get hash code of file " + file, e);
-                flag = !file.exists();
+                Logging.LOG.log(Level.WARNING, "Unable to calc hash value of file " + file.toPath(), e);
             }
-            if (flag) {
-                FileDownloadTask task = new FileDownloadTask(NetworkUtils.toURL(url), file, new IntegrityCheck("SHA-1", assetObject.getHash()));
+            if (download) {
+                List<URL> urls = dependencyManager.getDownloadProvider().getAssetObjectCandidates(assetObject.getLocation());
+
+                FileDownloadTask task = new FileDownloadTask(urls, file, new FileDownloadTask.IntegrityCheck("SHA-1", assetObject.getHash()));
                 task.setName(assetObject.getHash());
-                dependencies.add(task);
+                task.setCandidate(dependencyManager.getCacheRepository().getCommonDirectory()
+                        .resolve("assets").resolve("objects").resolve(assetObject.getLocation()));
+                task.setCacheRepository(dependencyManager.getCacheRepository());
+                task.setCaching(true);
+                dependencies.add(task.withCounter());
+            } else {
+                dependencyManager.getCacheRepository().tryCacheFile(file.toPath(), CacheRepository.SHA1, assetObject.getHash());
             }
+
+            updateProgress(++progress, index.getObjects().size());
+        }
+
+        if (!dependencies.isEmpty()) {
+            getProperties().put("total", dependencies.size());
         }
     }
-    
+
+    public static final boolean DOWNLOAD_INDEX_FORCIBLY = true;
+    public static final boolean DOWNLOAD_INDEX_IF_NECESSARY = false;
 }

@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,7 +13,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.game;
 
@@ -21,6 +21,7 @@ import com.google.gson.JsonParseException;
 import com.google.gson.annotations.SerializedName;
 import org.jackhuang.hmcl.util.Immutable;
 import org.jackhuang.hmcl.util.StringUtils;
+import org.jackhuang.hmcl.util.gson.TolerableValidationException;
 
 /**
  *
@@ -54,7 +55,7 @@ public class IdDownloadInfo extends DownloadInfo {
     }
 
     @Override
-    public void validate() throws JsonParseException {
+    public void validate() throws JsonParseException, TolerableValidationException {
         super.validate();
 
         if (StringUtils.isBlank(id))

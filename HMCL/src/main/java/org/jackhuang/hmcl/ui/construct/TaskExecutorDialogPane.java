@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,34 +13,36 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.ui.construct;
 
-import com.jfoenix.concurrency.JFXUtilities;
 import com.jfoenix.controls.JFXButton;
-import com.jfoenix.controls.JFXProgressBar;
+import javafx.application.Platform;
 import javafx.beans.property.StringProperty;
 import javafx.fxml.FXML;
 import javafx.scene.control.Label;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
+import org.jackhuang.hmcl.task.FileDownloadTask;
 import org.jackhuang.hmcl.task.TaskExecutor;
+import org.jackhuang.hmcl.task.TaskListener;
 import org.jackhuang.hmcl.ui.FXUtils;
 
 import java.util.Optional;
 import java.util.function.Consumer;
 
+import static org.jackhuang.hmcl.ui.FXUtils.runInFX;
+
 public class TaskExecutorDialogPane extends StackPane {
     private TaskExecutor executor;
     private Consumer<Region> onCancel;
+    private final Consumer<FileDownloadTask.SpeedEvent> speedEventHandler;
 
-    @FXML
-    private JFXProgressBar progressBar;
     @FXML
     private Label lblTitle;
     @FXML
-    private Label lblSubtitle;
+    private Label lblProgress;
     @FXML
     private JFXButton btnCancel;
     @FXML
@@ -55,13 +57,45 @@ public class TaskExecutorDialogPane extends StackPane {
             Optional.ofNullable(executor).ifPresent(TaskExecutor::cancel);
             onCancel.accept(this);
         });
+
+        speedEventHandler = speedEvent -> {
+            String unit = "B/s";
+            double speed = speedEvent.getSpeed();
+            if (speed > 1024) {
+                speed /= 1024;
+                unit = "KB/s";
+            }
+            if (speed > 1024) {
+                speed /= 1024;
+                unit = "MB/s";
+            }
+            double finalSpeed = speed;
+            String finalUnit = unit;
+            Platform.runLater(() -> {
+                lblProgress.setText(String.format("%.1f %s", finalSpeed, finalUnit));
+            });
+        };
+        FileDownloadTask.speedEvent.channel(FileDownloadTask.SpeedEvent.class).registerWeak(speedEventHandler);
     }
 
     public void setExecutor(TaskExecutor executor) {
+        setExecutor(executor, true);
+    }
+
+    public void setExecutor(TaskExecutor executor, boolean autoClose) {
         this.executor = executor;
 
-        if (executor != null)
+        if (executor != null) {
             taskListPane.setExecutor(executor);
+
+            if (autoClose)
+                executor.addTaskListener(new TaskListener() {
+                    @Override
+                    public void onStop(boolean success, TaskExecutor executor) {
+                        Platform.runLater(() -> fireEvent(new DialogCloseEvent()));
+                    }
+                });
+        }
     }
 
     public StringProperty titleProperty() {
@@ -76,28 +110,9 @@ public class TaskExecutorDialogPane extends StackPane {
         lblTitle.setText(currentState);
     }
 
-    public StringProperty subtitleProperty() {
-        return lblSubtitle.textProperty();
-    }
-
-    public String getSubtitle() {
-        return lblSubtitle.getText();
-    }
-
-    public void setSubtitle(String subtitle) {
-        lblSubtitle.setText(subtitle);
-    }
-
-    public void setProgress(double progress) {
-        if (progress == Double.MAX_VALUE)
-            progressBar.setVisible(false);
-        else
-            progressBar.setProgress(progress);
-    }
-
     public void setCancel(Consumer<Region> onCancel) {
         this.onCancel = onCancel;
 
-        JFXUtilities.runInFX(() -> btnCancel.setDisable(onCancel == null));
+        runInFX(() -> btnCancel.setDisable(onCancel == null));
     }
 }

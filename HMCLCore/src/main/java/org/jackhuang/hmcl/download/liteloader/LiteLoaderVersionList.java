@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,7 +13,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.download.liteloader;
 
@@ -21,9 +21,9 @@ import org.jackhuang.hmcl.download.DownloadProvider;
 import org.jackhuang.hmcl.download.VersionList;
 import org.jackhuang.hmcl.task.GetTask;
 import org.jackhuang.hmcl.task.Task;
-import org.jackhuang.hmcl.util.Constants;
-import org.jackhuang.hmcl.util.NetworkUtils;
-import org.jackhuang.hmcl.util.VersionNumber;
+import org.jackhuang.hmcl.util.gson.JsonUtils;
+import org.jackhuang.hmcl.util.io.NetworkUtils;
+import org.jackhuang.hmcl.util.versioning.VersionNumber;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -33,25 +33,30 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  *
  * @author huangyuhui
  */
-public final class LiteLoaderVersionList extends VersionList<LiteLoaderRemoteVersionTag> {
+public final class LiteLoaderVersionList extends VersionList<LiteLoaderRemoteVersion> {
 
-    public static final LiteLoaderVersionList INSTANCE = new LiteLoaderVersionList();
+    private final DownloadProvider downloadProvider;
 
-    private LiteLoaderVersionList() {
+    public LiteLoaderVersionList(DownloadProvider downloadProvider) {
+        this.downloadProvider = downloadProvider;
     }
 
     @Override
-    public Task refreshAsync(DownloadProvider downloadProvider) {
+    public boolean hasType() {
+        return false;
+    }
+
+    @Override
+    public Task<?> refreshAsync() {
         GetTask task = new GetTask(NetworkUtils.toURL(downloadProvider.injectURL(LITELOADER_LIST)));
-        return new Task() {
+        return new Task<Void>() {
             @Override
-            public Collection<Task> getDependents() {
+            public Collection<Task<?>> getDependents() {
                 return Collections.singleton(task);
             }
 
@@ -60,17 +65,16 @@ public final class LiteLoaderVersionList extends VersionList<LiteLoaderRemoteVer
                 lock.writeLock().lock();
 
                 try {
-                    LiteLoaderVersionsRoot root = Constants.GSON.fromJson(task.getResult(), LiteLoaderVersionsRoot.class);
+                    LiteLoaderVersionsRoot root = JsonUtils.GSON.fromJson(task.getResult(), LiteLoaderVersionsRoot.class);
                     versions.clear();
 
                     for (Map.Entry<String, LiteLoaderGameVersions> entry : root.getVersions().entrySet()) {
                         String gameVersion = entry.getKey();
                         LiteLoaderGameVersions liteLoader = entry.getValue();
-                        Optional<String> gg = VersionNumber.parseVersion(gameVersion);
-                        if (!gg.isPresent())
-                            continue;
-                        doBranch(gg.get(), gameVersion, liteLoader.getRepoitory(), liteLoader.getArtifacts(), false);
-                        doBranch(gg.get(), gameVersion, liteLoader.getRepoitory(), liteLoader.getSnapshots(), true);
+
+                        String gg = VersionNumber.normalize(gameVersion);
+                        doBranch(gg, gameVersion, liteLoader.getRepoitory(), liteLoader.getArtifacts(), false);
+                        doBranch(gg, gameVersion, liteLoader.getRepoitory(), liteLoader.getSnapshots(), true);
                     }
                 } finally {
                     lock.writeLock().unlock();
@@ -98,7 +102,7 @@ public final class LiteLoaderVersionList extends VersionList<LiteLoaderRemoteVer
                     }
 
                     versions.put(key, new LiteLoaderRemoteVersion(gameVersion,
-                            version, downloadProvider.injectURL(url),
+                            version, Collections.singletonList(url),
                             v.getTweakClass(), v.getLibraries()
                     ));
                 }

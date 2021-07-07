@@ -1,6 +1,6 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -13,91 +13,108 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.setting;
 
 import com.google.gson.*;
+import com.google.gson.annotations.JsonAdapter;
+import javafx.application.Platform;
 import javafx.beans.InvalidationListener;
-import javafx.beans.property.BooleanProperty;
-import javafx.beans.property.SimpleBooleanProperty;
-
-import org.jackhuang.hmcl.game.HMCLDependencyManager;
+import javafx.beans.Observable;
+import javafx.beans.property.*;
+import org.jackhuang.hmcl.download.DefaultDependencyManager;
+import org.jackhuang.hmcl.download.DownloadProvider;
+import org.jackhuang.hmcl.event.EventBus;
+import org.jackhuang.hmcl.event.EventPriority;
+import org.jackhuang.hmcl.event.RefreshedVersionsEvent;
+import org.jackhuang.hmcl.game.HMCLCacheRepository;
 import org.jackhuang.hmcl.game.HMCLGameRepository;
-import org.jackhuang.hmcl.mod.ModManager;
-import org.jackhuang.hmcl.util.ImmediateObjectProperty;
-import org.jackhuang.hmcl.util.ImmediateStringProperty;
+import org.jackhuang.hmcl.game.Version;
+import org.jackhuang.hmcl.ui.WeakListenerHolder;
 import org.jackhuang.hmcl.util.ToStringBuilder;
+import org.jackhuang.hmcl.util.javafx.ObservableHelper;
 
 import java.io.File;
 import java.lang.reflect.Type;
 import java.util.Optional;
 
+import static org.jackhuang.hmcl.ui.FXUtils.onInvalidating;
+import static org.jackhuang.hmcl.ui.FXUtils.runInFX;
+
 /**
  *
  * @author huangyuhui
  */
-public final class Profile {
-
+@JsonAdapter(Profile.Serializer.class)
+public final class Profile implements Observable {
+    private final WeakListenerHolder listenerHolder = new WeakListenerHolder();
     private final HMCLGameRepository repository;
-    private final ModManager modManager;
 
-    private final ImmediateObjectProperty<File> gameDirProperty;
+    private final StringProperty selectedVersion = new SimpleStringProperty();
 
-    public ImmediateObjectProperty<File> gameDirProperty() {
-        return gameDirProperty;
+    public StringProperty selectedVersionProperty() {
+        return selectedVersion;
+    }
+
+    public String getSelectedVersion() {
+        return selectedVersion.get();
+    }
+
+    public void setSelectedVersion(String selectedVersion) {
+        this.selectedVersion.set(selectedVersion);
+    }
+
+    private final ObjectProperty<File> gameDir;
+
+    public ObjectProperty<File> gameDirProperty() {
+        return gameDir;
     }
 
     public File getGameDir() {
-        return gameDirProperty.get();
+        return gameDir.get();
     }
 
     public void setGameDir(File gameDir) {
-        gameDirProperty.set(gameDir);
+        this.gameDir.set(gameDir);
     }
 
-    private final ImmediateObjectProperty<VersionSetting> globalProperty = new ImmediateObjectProperty<>(this, "global", new VersionSetting());
+    private final ReadOnlyObjectWrapper<VersionSetting> global = new ReadOnlyObjectWrapper<>(this, "global");
 
-    public ImmediateObjectProperty<VersionSetting> globalProperty() {
-        return globalProperty;
+    public ReadOnlyObjectProperty<VersionSetting> globalProperty() {
+        return global.getReadOnlyProperty();
     }
 
     public VersionSetting getGlobal() {
-        return globalProperty.get();
+        return global.get();
     }
 
-    public void setGlobal(VersionSetting global) {
-        if (global == null)
-            global = new VersionSetting();
-        globalProperty.set(global);
-    }
+    private final SimpleStringProperty name;
 
-    private final ImmediateStringProperty nameProperty;
-
-    public ImmediateStringProperty nameProperty() {
-        return nameProperty;
+    public StringProperty nameProperty() {
+        return name;
     }
 
     public String getName() {
-        return nameProperty.get();
+        return name.get();
     }
 
     public void setName(String name) {
-        nameProperty.set(name);
+        this.name.set(name);
     }
 
-    private BooleanProperty useRelativePathProperty = new SimpleBooleanProperty(this, "useRelativePath", false);
+    private BooleanProperty useRelativePath = new SimpleBooleanProperty(this, "useRelativePath", false);
 
     public BooleanProperty useRelativePathProperty() {
-        return useRelativePathProperty();
+        return useRelativePath;
     }
 
     public boolean isUseRelativePath() {
-        return useRelativePathProperty.get();
+        return useRelativePath.get();
     }
 
     public void setUseRelativePath(boolean useRelativePath) {
-        useRelativePathProperty.set(useRelativePath);
+        this.useRelativePath.set(useRelativePath);
     }
 
     public Profile(String name) {
@@ -105,60 +122,56 @@ public final class Profile {
     }
 
     public Profile(String name, File initialGameDir) {
-        nameProperty = new ImmediateStringProperty(this, "name", name);
-        gameDirProperty = new ImmediateObjectProperty<>(this, "gameDir", initialGameDir);
-        repository = new HMCLGameRepository(this, initialGameDir);
-        modManager = new ModManager(repository);
+        this(name, initialGameDir, new VersionSetting());
+    }
 
-        gameDirProperty.addListener((a, b, newValue) -> repository.changeDirectory(newValue));
+    public Profile(String name, File initialGameDir, VersionSetting global) {
+        this(name, initialGameDir, global, null, false);
+    }
+
+    public Profile(String name, File initialGameDir, VersionSetting global, String selectedVersion, boolean useRelativePath) {
+        this.name = new SimpleStringProperty(this, "name", name);
+        gameDir = new SimpleObjectProperty<>(this, "gameDir", initialGameDir);
+        repository = new HMCLGameRepository(this, initialGameDir);
+        this.global.set(global == null ? new VersionSetting() : global);
+        this.selectedVersion.set(selectedVersion);
+        this.useRelativePath.set(useRelativePath);
+
+        gameDir.addListener((a, b, newValue) -> repository.changeDirectory(newValue));
+        this.selectedVersion.addListener(o -> checkSelectedVersion());
+        listenerHolder.add(EventBus.EVENT_BUS.channel(RefreshedVersionsEvent.class).registerWeak(event -> checkSelectedVersion(), EventPriority.HIGHEST));
+
+        addPropertyChangedListener(onInvalidating(this::invalidate));
+    }
+
+    private void checkSelectedVersion() {
+        runInFX(() -> {
+            if (!repository.isLoaded()) return;
+            String newValue = selectedVersion.get();
+            if (!repository.hasVersion(newValue)) {
+                Optional<String> version = repository.getVersions().stream().findFirst().map(Version::getId);
+                if (version.isPresent())
+                    selectedVersion.setValue(version.get());
+                else if (newValue != null)
+                    selectedVersion.setValue(null);
+            }
+        });
     }
 
     public HMCLGameRepository getRepository() {
         return repository;
     }
 
-    public ModManager getModManager() {
-        return modManager;
+    public DefaultDependencyManager getDependency() {
+        return getDependency(DownloadProviders.getDownloadProvider());
     }
 
-    public HMCLDependencyManager getDependency() {
-        return new HMCLDependencyManager(this, Settings.INSTANCE.getDownloadProvider());
+    public DefaultDependencyManager getDependency(DownloadProvider downloadProvider) {
+        return new DefaultDependencyManager(repository, downloadProvider, HMCLCacheRepository.REPOSITORY);
     }
 
     public VersionSetting getVersionSetting(String id) {
-        VersionSetting vs = repository.getVersionSetting(id);
-        if (vs == null || vs.isUsesGlobal()) {
-            getGlobal().setGlobal(true); // always keep global.isGlobal = true
-            getGlobal().setUsesGlobal(true);
-            return getGlobal();
-        } else
-            return vs;
-    }
-
-    public boolean isVersionGlobal(String id) {
-        VersionSetting vs = repository.getVersionSetting(id);
-        return vs == null || vs.isUsesGlobal();
-    }
-
-    /**
-     * Make version use self version settings instead of the global one.
-     * @param id the version id.
-     * @return specialized version setting, null if given version does not exist.
-     */
-    public VersionSetting specializeVersionSetting(String id) {
-        VersionSetting vs = repository.getVersionSetting(id);
-        if (vs == null)
-            vs = repository.createVersionSetting(id);
-        if (vs == null)
-            return null;
-        vs.setUsesGlobal(false);
-        return vs;
-    }
-
-    public void globalizeVersionSetting(String id) {
-        VersionSetting vs = repository.getVersionSetting(id);
-        if (vs != null)
-            vs.setUsesGlobal(true);
+        return repository.getVersionSetting(id);
     }
 
     @Override
@@ -170,19 +183,32 @@ public final class Profile {
                 .toString();
     }
 
-    public void addPropertyChangedListener(InvalidationListener listener) {
-        nameProperty.addListener(listener);
-        globalProperty.addListener(listener);
-        gameDirProperty.addListener(listener);
-        useRelativePathProperty.addListener(listener);
+    private void addPropertyChangedListener(InvalidationListener listener) {
+        name.addListener(listener);
+        global.addListener(listener);
+        gameDir.addListener(listener);
+        useRelativePath.addListener(listener);
+        global.get().addPropertyChangedListener(listener);
+        selectedVersion.addListener(listener);
+    }
+
+    private ObservableHelper observableHelper = new ObservableHelper(this);
+
+    @Override
+    public void addListener(InvalidationListener listener) {
+        observableHelper.addListener(listener);
+    }
+
+    @Override
+    public void removeListener(InvalidationListener listener) {
+        observableHelper.removeListener(listener);
+    }
+
+    private void invalidate() {
+        Platform.runLater(observableHelper::invalidate);
     }
 
     public static final class Serializer implements JsonSerializer<Profile>, JsonDeserializer<Profile> {
-        public static final Serializer INSTANCE = new Serializer();
-
-        private Serializer() {
-        }
-
         @Override
         public JsonElement serialize(Profile src, Type typeOfSrc, JsonSerializationContext context) {
             if (src == null)
@@ -192,21 +218,22 @@ public final class Profile {
             jsonObject.add("global", context.serialize(src.getGlobal()));
             jsonObject.addProperty("gameDir", src.getGameDir().getPath());
             jsonObject.addProperty("useRelativePath", src.isUseRelativePath());
+            jsonObject.addProperty("selectedMinecraftVersion", src.getSelectedVersion());
 
             return jsonObject;
         }
 
         @Override
         public Profile deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
-            if (json == null || json == JsonNull.INSTANCE || !(json instanceof JsonObject)) return null;
+            if (json == JsonNull.INSTANCE || !(json instanceof JsonObject)) return null;
             JsonObject obj = (JsonObject) json;
             String gameDir = Optional.ofNullable(obj.get("gameDir")).map(JsonElement::getAsString).orElse("");
 
-            Profile profile = new Profile("Default", new File(gameDir));
-            profile.setGlobal(context.deserialize(obj.get("global"), VersionSetting.class));
-
-            profile.setUseRelativePath(Optional.ofNullable(obj.get("useRelativePath")).map(JsonElement::getAsBoolean).orElse(false));
-            return profile;
+            return new Profile("Default",
+                    new File(gameDir),
+                    context.deserialize(obj.get("global"), VersionSetting.class),
+                    Optional.ofNullable(obj.get("selectedMinecraftVersion")).map(JsonElement::getAsString).orElse(""),
+                    Optional.ofNullable(obj.get("useRelativePath")).map(JsonElement::getAsBoolean).orElse(false));
         }
 
     }

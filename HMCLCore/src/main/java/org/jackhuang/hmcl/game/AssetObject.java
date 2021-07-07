@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,13 +13,18 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.game;
 
 import com.google.gson.JsonParseException;
+import org.jackhuang.hmcl.util.DigestUtils;
+import org.jackhuang.hmcl.util.Hex;
 import org.jackhuang.hmcl.util.StringUtils;
-import org.jackhuang.hmcl.util.Validation;
+import org.jackhuang.hmcl.util.gson.Validation;
+
+import java.io.IOException;
+import java.nio.file.Path;
 
 /**
  *
@@ -53,7 +58,12 @@ public final class AssetObject implements Validation {
 
     @Override
     public void validate() throws JsonParseException {
-        if (StringUtils.isBlank(hash))
-            throw new IllegalStateException("AssetObject hash cannot be blank.");
+        if (StringUtils.isBlank(hash) || hash.length() < 2)
+            throw new JsonParseException("AssetObject hash cannot be blank.");
+    }
+
+    public boolean validateChecksum(Path file, boolean defaultValue) throws IOException {
+        if (hash == null) return defaultValue;
+        return Hex.encodeHex(DigestUtils.digest("SHA-1", file)).equalsIgnoreCase(hash);
     }
 }

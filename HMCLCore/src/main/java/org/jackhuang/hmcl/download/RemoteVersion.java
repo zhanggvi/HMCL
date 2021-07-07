@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,13 +13,16 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.download;
 
+import org.jackhuang.hmcl.game.Version;
+import org.jackhuang.hmcl.task.Task;
 import org.jackhuang.hmcl.util.ToStringBuilder;
-import org.jackhuang.hmcl.util.VersionNumber;
+import org.jackhuang.hmcl.util.versioning.VersionNumber;
 
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -27,26 +30,42 @@ import java.util.Objects;
  *
  * @author huangyuhui
  */
-public class RemoteVersion<T> implements Comparable<RemoteVersion<T>> {
+public class RemoteVersion implements Comparable<RemoteVersion> {
 
+    private final String libraryId;
     private final String gameVersion;
     private final String selfVersion;
-    private final String url;
-    private final T tag;
+    private final List<String> urls;
+    private final Type type;
 
     /**
      * Constructor.
      *
      * @param gameVersion the Minecraft version that this remote version suits.
      * @param selfVersion the version string of the remote version.
-     * @param url the installer or universal jar URL.
-     * @param tag some necessary information for Installer Task.
+     * @param urls        the installer or universal jar original URL.
      */
-    public RemoteVersion(String gameVersion, String selfVersion, String url, T tag) {
+    public RemoteVersion(String libraryId, String gameVersion, String selfVersion, List<String> urls) {
+        this(libraryId, gameVersion, selfVersion, Type.UNCATEGORIZED, urls);
+    }
+
+    /**
+     * Constructor.
+     *
+     * @param gameVersion the Minecraft version that this remote version suits.
+     * @param selfVersion the version string of the remote version.
+     * @param urls        the installer or universal jar URL.
+     */
+    public RemoteVersion(String libraryId, String gameVersion, String selfVersion, Type type, List<String> urls) {
+        this.libraryId = Objects.requireNonNull(libraryId);
         this.gameVersion = Objects.requireNonNull(gameVersion);
         this.selfVersion = Objects.requireNonNull(selfVersion);
-        this.url = Objects.requireNonNull(url);
-        this.tag = tag;
+        this.urls = Objects.requireNonNull(urls);
+        this.type = Objects.requireNonNull(type);
+    }
+
+    public String getLibraryId() {
+        return libraryId;
     }
 
     public String getGameVersion() {
@@ -57,12 +76,16 @@ public class RemoteVersion<T> implements Comparable<RemoteVersion<T>> {
         return selfVersion;
     }
 
-    public T getTag() {
-        return tag;
+    public List<String> getUrls() {
+        return urls;
     }
 
-    public String getUrl() {
-        return url;
+    public Type getVersionType() {
+        return type;
+    }
+
+    public Task<Version> getInstallTask(DefaultDependencyManager dependencyManager, Version baseVersion) {
+        throw new UnsupportedOperationException(toString() + " cannot be installed yet");
     }
 
     @Override
@@ -80,13 +103,19 @@ public class RemoteVersion<T> implements Comparable<RemoteVersion<T>> {
         return new ToStringBuilder(this)
                 .append("selfVersion", selfVersion)
                 .append("gameVersion", gameVersion)
-                .append("tag", tag)
                 .toString();
     }
 
     @Override
-    public int compareTo(RemoteVersion<T> o) {
+    public int compareTo(RemoteVersion o) {
         // newer versions are smaller than older versions
         return VersionNumber.asVersion(o.selfVersion).compareTo(VersionNumber.asVersion(selfVersion));
+    }
+
+    public enum Type {
+        UNCATEGORIZED,
+        RELEASE,
+        SNAPSHOT,
+        OLD
     }
 }

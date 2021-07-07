@@ -4,7 +4,6 @@
 hs_err_pid*
 
 .gradle
-.idea
 
 *.lck
 *.1
@@ -12,14 +11,34 @@ hs_err_pid*
 *.log
 .mine*
 NVIDIA
-*.json
 
 # gradle build
 /build/
 /HMCL/build/
 /HMCLCore/build/
+/HMCLTransformerDiscoveryService/build/
 
-# idea output
+# idea
+.idea
 /out/
 /HMCL/out/
 /HMCLCore/out/
+/HMCLTransformerDiscoveryService/out/
+
+# eclipse
+/bin/
+/HMCL/bin/
+/HMCLCore/bin/
+/HMCLTransformerDiscoveryService/bin/
+.classpath
+.project
+.settings
+
+# netbeans
+.nb-gradle
+
+*.exe
+!/HMCL/src/main/resources/assets/HMCLauncher.exe
+
+# macos
+.DS_Store

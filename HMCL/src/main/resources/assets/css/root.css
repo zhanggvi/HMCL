@@ -1,22 +1,31 @@
-/*
- *	Apply google Roboto font to all UI components
- *  #5264AE
+/**
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 .root {
-    -fx-base-font-family: "微软雅黑", "Microsoft YaHei", "Roboto";
-    -fx-font-family: -fx-base-font-family;
+}
+
+.scroll-bar .thumb {
+    -fx-fill: rgba(255, 255, 255, 0.5);
+    -fx-arc-width: 5px;
+    -fx-arc-height: 5px;
 }
 
 .disabled Label {
-    -fx-text-fill: gray;
-}
-
-.side-menu {
-    -fx-padding: 20.0, 10.0;
-    -fx-font-size: 15.0;
-    -fx-font-weight: NORMAL;
-    -fx-text-fill: #444;
+    -fx-text-fill: rgba(0, 0, 0, 0.5);
 }
 
 .title-label {
@@ -26,7 +35,7 @@
 }
 
 .subtitle-label {
-    -fx-text-fill: gray;
+    -fx-text-fill: rgba(0, 0, 0, 0.5);
 }
 
 .update-label {
@@ -41,16 +50,21 @@
 
 .rippler-container {
     -jfx-rippler-fill: -fx-base-check-color;
-    -fx-border-color: red;
-    -fx-border-width: 1;
 }
 
 .rippler-container:selected .label {
     -fx-text-fill: -fx-base-text-fill;
 }
 
-.rippler-container= .label {
-    -fx-text-fill: white;
+.advanced-list-item:selected .container {
+    -fx-background-color: -fx-base-rippler-color;
+}
+
+.notice-pane > .label {
+    -fx-text-fill: #0079FF;
+    -fx-font-size: 20;
+    -fx-wrap-text: true;
+    -fx-text-alignment: CENTER;
 }
 
 .class-title {
@@ -59,11 +73,111 @@
 }
 
 .advanced-list-box-item {
-    -fx-padding: 10 16 10 16;
+    -fx-padding: 0 16 0 16;
 }
 
 .advanced-list-box-content {
     -fx-padding: 20 0 20 0;
+}
+
+.iconed-item {
+    -jfx-rippler-fill: -fx-base-color;
+}
+
+.iconed-item .iconed-item-container {
+    -fx-padding: 10 16 10 16;
+    -fx-spacing: 10;
+    -fx-font-size: 14;
+    -fx-alignment: CENTER_LEFT;
+}
+
+.iconed-menu-item {
+    -jfx-rippler-fill: -fx-base-color;
+}
+
+.iconed-menu-item .iconed-item-container {
+    -fx-padding: 8 16 8 16;
+    -fx-spacing: 10;
+    -fx-font-size: 12;
+    -fx-alignment: CENTER_LEFT;
+}
+
+.menu-container {
+    -fx-padding: 8 16 8 16;
+}
+
+.popup-menu .scroll-bar .thumb {
+    -fx-fill: rgba(0, 0, 0, 0.5);
+}
+
+.popup-menu .content {
+    -fx-padding: 4 0 4 0;
+}
+
+.two-line-list-item HBox {
+    -fx-spacing: 8;
+    -fx-alignment: center-left;
+}
+
+.two-line-list-item .title {
+	-fx-text-fill: #292929;
+	-fx-font-size: 15px;
+}
+
+.two-line-list-item .subtitle {
+	-fx-text-fill: rgba(0, 0, 0, 0.5);
+}
+
+.two-line-list-item .tag {
+    -fx-text-fill: -fx-base-color;
+    -fx-background-color: -fx-base-rippler-color;
+    -fx-padding: 2;
+}
+
+.bubble {
+    -fx-background-color: rgba(0, 0, 0, 0.5);
+    -fx-background-radius: 2px;
+    -fx-text-fill: white;
+}
+
+.bubble .two-line-list-item > .title,
+.bubble .two-line-list-item > .subtitle {
+	-fx-text-fill: white;
+}
+
+.sponsor-pane {
+    -fx-padding: 16;
+    -fx-cursor: hand;
+}
+
+.sponsor-pane .label {
+    -fx-wrap-text: true;
+}
+
+/*******************************************************************************
+ *                                                                             *
+ * Main Page                                                                   *
+ *                                                                             *
+ ******************************************************************************/
+
+.launch-pane .jfx-button {
+    -fx-background-color: -fx-base-color;
+    -fx-cursor: hand;
+}
+
+.launch-pane .jfx-button .jfx-rippler {
+    -jfx-rippler-fill: white;
+    -jfx-mask-type: CIRCLE;
+    -fx-padding: 0.0;
+}
+
+.launch-pane .jfx-button, .jfx-button * {
+    -fx-text-fill: -fx-base-text-fill;
+    -fx-font-size: 14px;
+}
+
+.launch-pane Rectangle {
+    -fx-fill: -fx-base-darker-color;
 }
 
 /*******************************************************************************
@@ -85,7 +199,6 @@
 }
 
 .tab-label {
-    -fx-font-family: "Roboto";
     -fx-font-size: 16;
 }
 
@@ -174,7 +287,7 @@
 
 .jfx-popup-container {
     -fx-background-color: WHITE;
-    -fx-pref-width: 151.0px;
+    -fx-background-radius: 4;
 }
 
 .popup-list-view {
@@ -269,20 +382,37 @@
 
 .jfx-tool-bar {
     -fx-font-size: 13.0;
-    -fx-font-weight: BOLD;
-    -fx-background-color: -fx-base-color;
     -fx-pref-width: 100.0%;
-    -fx-pref-height: 32.0px;
+    -fx-min-height: 40px;
+    -fx-max-height: 40px;
+    -fx-pref-height: 40px;
+}
+
+.jfx-tool-bar .jfx-decorator-title {
+    -fx-font-weight: BOLD;
+}
+
+.jfx-tool-bar .background {
+    -fx-background-color: -fx-base-color;
 }
 
 .jfx-tool-bar HBox {
-    -fx-alignment: center;
-/*    -fx-spacing: 25.0;*/
+    -fx-alignment: center-left;
     -fx-padding: 0.0 5.0;
 }
 
 .jfx-tool-bar .jfx-decorator-button {
-    -fx-cursor: head;
+    -fx-min-width: 40px;
+    -fx-max-width: 40px;
+    -fx-pref-width: 40px;
+    -fx-min-height: 40px;
+    -fx-max-height: 40px;
+    -fx-pref-height: 40px;
+    -fx-cursor: hand;
+}
+
+.jfx-tool-bar .jfx-decorator-button .svg {
+    -fx-fill: -fx-base-text-fill;
 }
 
 .jfx-tool-bar Label {
@@ -301,10 +431,43 @@
     -jfx-rippler-fill: WHITE;
 }
 
+.jfx-tool-bar-second {
+    -fx-pref-height: 42;
+    -fx-padding: 2 2 2 2;
+    -fx-background-color: -fx-base-check-color;
+    -fx-alignment: CENTER-LEFT;
+    -fx-spacing: 8;
+}
+
+.jfx-tool-bar-second .jfx-rippler {
+    -jfx-rippler-fill: WHITE;
+}
+
+.jfx-tool-bar-button {
+    -fx-toggle-icon4-size: 37px;
+    -fx-pref-height: -fx-toggle-icon4-size;
+    -fx-max-height: -fx-toggle-icon4-size;
+    -fx-min-height: -fx-toggle-icon4-size;
+    -fx-background-radius: 5px;
+    -fx-background-color: transparent;
+    -jfx-toggle-color: white;
+    -jfx-untoggle-color: transparent;
+}
+
+.jfx-tool-bar-button .icon {
+    -fx-fill: rgb(204.0, 204.0, 51.0);
+    -fx-padding: 10.0;
+}
+
+.jfx-tool-bar-button .jfx-rippler {
+    -jfx-rippler-fill: white;
+    -jfx-mask-type: CIRCLE;
+}
+
 .jfx-decorator-button {
-    -fx-max-width: 35px;
-    -fx-background-radius: 40px;
-    -fx-max-height: 35px;
+    -fx-max-width: 40px;
+    -fx-background-radius: 5px;
+    -fx-max-height: 40px;
     -fx-background-color: transparent;
     -jfx-toggle-color: rgba(128, 128, 255, 0.2);
     -jfx-untoggle-color: transparent;
@@ -351,33 +514,6 @@
     -fx-fill: -fx-base-check-color;
 }
 
-.custom-jfx-radio-button {
-    -fx-font-size: 16.0px;
-}
-
-.custom-jfx-radio-button .radio {
-    -fx-stroke-width: 2.0px;
-    -fx-fill: transparent;
-}
-
-.custom-jfx-radio-button-blue {
-    -fx-text-fill: -fx-base-color;
-    -jfx-selected-color: -fx-base-color;
-    -jfx-unselected-color: #212121;
-}
-
-.custom-jfx-radio-button-red {
-    -fx-text-fill: #f44336;
-    -jfx-selected-color: #f44336;
-    -jfx-unselected-color: #b71c1c;
-}
-
-.custom-jfx-radio-button-green {
-    -fx-text-fill: #4caf50;
-    -jfx-selected-color: #4caf50;
-    -jfx-unselected-color: #1b5e20;
-}
-
 /*******************************************************************************
  *                                                                             *
  * JFX Slider                                                                  *
@@ -418,18 +554,12 @@
     -fx-font-size: 10.0;
 }
 
-/******************************************************/
-
 /*******************************************************************************
 *                                                                              *
 * JFX Rippler                                                                  *
 *                                                                              *
 *******************************************************************************/
 
-/*.jfx-rippler {
-	-fx-rippler-fill: -fx-base-color;
-	-fx-mask-type: RECT;
-}*/
 .jfx-rippler:hover {
     -fx-cursor: hand;
 }
@@ -440,37 +570,41 @@
 *                                                                              *
 *******************************************************************************/
 
-.custom-jfx-button-raised .jfx-rippler {
-    -jfx-rippler-fill: YELLOW;
+.jfx-button {
+    -jfx-disable-visual-focus: true;
+    -fx-cursor: hand;
 }
 
-.custom-jfx-button-raised {
-    -fx-padding: 0.7em 0.57em;
-    -fx-font-size: 14.0px;
-    -jfx-button-type: RAISED;
-    -fx-background-color: rgb(102.0, 153.0, 102.0);
-    -fx-pref-width: 200.0;
-    -fx-text-fill: WHITE;
-}
-
-.circle-jfx-button-raised .jfx-rippler {
-    -jfx-rippler-fill: YELLOW;
-}
-
-.circle-jfx-button-raised {
-    -fx-padding: 0.7em 0.57em;
-    -fx-font-size: 14.0px;
-    -jfx-button-type: RAISED;
-    -fx-background-color: rgb(102.0, 153.0, 102.0);
-    -fx-pref-width: 200.0;
-    -fx-text-fill: WHITE;
+.jfx-button .jfx-rippler {
+    -jfx-rippler-fill: -fx-base-check-color;
     -jfx-mask-type: CIRCLE;
+    -fx-padding: 0.0;
 }
 
 .jfx-button-raised {
-    -fx-text-fill: white;
     -fx-background-color: -fx-base-color;
-    -fx-font-size:14px;
+}
+
+.jfx-button-raised .jfx-rippler {
+    -jfx-rippler-fill: white;
+    -jfx-mask-type: CIRCLE;
+    -fx-padding: 0.0;
+}
+
+.jfx-button-raised, .jfx-button-raised * {
+    -fx-text-fill: -fx-base-text-fill;
+    -fx-font-size: 14px;
+}
+
+.jfx-button-border {
+    -fx-border-color: gray;
+    -fx-border-radius: 5px;
+    -fx-border-width: 0.2px;
+    -fx-padding: 8px;
+}
+
+.jfx-button-border, .jfx-button-border * {
+    -fx-text-fill: -fx-base-darker-color;
 }
 
 .jfx-button-raised-round {
@@ -487,20 +621,6 @@
 .jfx-check-box {
     -fx-font-weight: BOLD;
     -jfx-checked-color: -fx-base-check-color;
-}
-
-.custom-jfx-check-box {
-    -jfx-checked-color: RED;
-}
-
-.custom-jfx-check-box-all-colored {
-    -jfx-checked-color: -fx-base-color;
-    -jfx-unchecked-color: -fx-base-color;
-    -fx-text-fill: -fx-base-color;
-}
-
-.custom-jfx-check-box-text-colored {
-    -fx-text-fill: rgb(153.0, 0.0, 0.0);
 }
 
 /*******************************************************************************
@@ -524,15 +644,6 @@
 
 .jfx-progress-bar > .bar {
     -fx-background-color: -fx-base-check-color;
-}
-
-.custom-jfx-progress-bar > .bar {
-    -fx-background-color: rgb(255.0, 128.0, 0.0);
-}
-
-.custom-jfx-progress-bar-stroke > .bar {
-    -fx-background-color: -fx-base-color;
-    -fx-padding: 6;
 }
 
 /*******************************************************************************
@@ -561,18 +672,13 @@
 *                                                                              *
 *******************************************************************************/
 
-.jfx-list-cell:odd,
-.jfx-list-cell:even {
-    -fx-background-color: WHITE;
+.jfx-list-cell, .list-cell {
+    /*-fx-background-color: WHITE;*/
+    -fx-background-color: transparent;
 }
 
-.list-cell:selected, .jfx-list-cell:selected {
-    -fx-background-insets: 0.0;
-    -fx-text-fill: BLACK;
-}
-
-.jfx-list-cell:filled:hover,
-.jfx-list-cell:selected .label {
+.list-cell:selected, .jfx-list-cell:selected,
+.list-cell:hover, .jfx-list-cell:hover {
     -fx-text-fill: black;
 }
 
@@ -591,47 +697,24 @@
     -jfx-cell-vertical-margin: 5.0;
     -jfx-vertical-gap: 10.0;
     -jfx-expanded: false;
-}
-
-.custom-jfx-list-view .jfx-list-cell:odd:selected > .jfx-rippler > StackPane,
-.custom-jfx-list-view .jfx-list-cell:even:selected > .jfx-rippler > StackPane {
-    -fx-background-color: rgba(255, 0, 0, 0.2);
-}
-
-.custom-jfx-list-view {
-    -fx-background-insets: 0.0;
-    -jfx-cell-horizontal-margin: 0.0;
-    -jfx-cell-vertical-margin: 5.0;
-    -jfx-expanded: false;
-    -fx-max-width: 200.0px;
-    /* important to hide the list change of height */
-    -fx-background-color: TRANSPARENT;
-}
-
-.custom-jfx-list-view .jfx-rippler {
-    -jfx-rippler-fill: RED;
-}
-
-.custom-jfx-list-view1 {
-    -jfx-vertical-gap: 10.0;
-    -fx-pref-width: 150px;
     -fx-background-color: transparent;
 }
 
-.custom-jfx-list-view-icon,
-.jfx-list-cell:selected .label .custom-jfx-list-view-icon {
-    -fx-fill: -fx-base-color;
-    -fx-padding: 0.0 10.0 0.0 5.0;
-    -fx-cursor: hand;
+.jfx-list-view .scroll-bar {
+    -fx-skin: "org.jackhuang.hmcl.ui.construct.FloatScrollBarSkin";
 }
 
-.custom-jfx-list-view-icon-container {
-    -fx-pref-width: 40px;
+.jfx-list-view .scroll-bar .track {
+    -fx-fill: transparent;
 }
 
-.custom-jfx-list-view .sublist-item {
-    -fx-border-color: #e0e0e0;
-    -fx-border-width: 1 0 1 0;
+.jfx-list-view-float {
+    -fx-background-insets: 0.0;
+    -jfx-cell-horizontal-margin: 0.0;
+    -jfx-cell-vertical-margin: 5.0;
+    -jfx-vertical-gap: 10.0;
+    -jfx-expanded: false;
+    -fx-background-color: transparent;
 }
 
 .options-list {
@@ -640,7 +723,13 @@
 }
 
 .card {
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.26), 5, 0.06, -0.5, 1);
+    -fx-background-color: WHITE;
+    -fx-background-radius: 4;
+    -fx-padding: 8px;
+}
+
+.card:selected {
+    -fx-background-color: derive(-fx-base-color, 60%);
 }
 
 .options-sublist {
@@ -655,11 +744,18 @@
     -fx-font-size: 12;
 }
 
-.options-list-item-ahead {
-    -fx-background-radius: 2 2 0 0;
-    -fx-background-color: white;
-    -fx-padding: 10 16 10 16;
-    -fx-font-size: 12;
+.options-list-item:first {
+    -fx-background-radius: 4 4 0 0;
+    -fx-border-width: 0;
+}
+
+.options-list-item:last {
+    -fx-background-radius: 0 0 4 4;
+}
+
+.options-list-item:first:last {
+    -fx-background-radius: 4 4 4 4;
+    -fx-border-width: 0;
 }
 
 .options-list-item-expand-button {
@@ -686,20 +782,6 @@
     -jfx-mask-type: CIRCLE;
 }
 
-.custom-jfx-list-view .jfx-list-cell .sublist-header > .drop-icon {
-    -fx-background-color: GRAY;
-}
-
-.custom-jfx-list-view .jfx-list-cell:filled:hover .sublist-header > .drop-icon {
-    -fx-background-color: BLACK;
-}
-
-/*******************************************************************************/
-/*******************************************************************************/
-/*******************************************************************************/
-/*******************************************************************************/
-/*******************************************************************************/
-/*******************************************************************************/
 /*******************************************************************************
 *                                                                              *
 * JFX SUBLIST IMPORTANT                                                        *
@@ -739,10 +821,6 @@
     -fx-padding: 0 0 0 12;
 }
 
-/*.custom-jfx-list-view .sublist-container {
-	-fx-padding : 0 0 5 0;
-}*/
-
 /*******************************************************************************
 *                                                                              *
 * JFX Toggle Button                                                            *
@@ -751,14 +829,6 @@
 
 .jfx-toggle-button {
     -jfx-toggle-color: -fx-base-check-color;
-}
-
-.custom-jfx-toggle-button {
-    -jfx-toggle-color: #4285F4;
-}
-
-.custom-jfx-toggle-button-red {
-    -jfx-toggle-color: red;
 }
 
 .toggle-label {
@@ -876,6 +946,12 @@
     -fx-background-color: null;
 }
 
+/*******************************************************************************
+*                                                                              *
+* Log Window                                                                   *
+*                                                                              *
+*******************************************************************************/
+
 .log-toggle:selected {
     -fx-background-color: transparent;
     -fx-border: 1px;
@@ -888,6 +964,44 @@
     -fx-border: 1px;
     -fx-border-color: gray;
     -fx-text-fill: gray;
+}
+
+.log-window .scroll-bar .thumb {
+    -fx-fill: rgba(0, 0, 0, 0.5);
+}
+
+.log-window .list-cell {
+    -fx-text-fill: black;
+    -fx-border-width: 0 0 1 0;
+    -fx-border-color: #dddddd;
+}
+
+.log-window .list-cell:empty {
+    -fx-border-width: 0;
+}
+
+.log-window .list-cell:fatal {
+    -fx-background-color: #F7A699;
+}
+
+.log-window .list-cell:error {
+    -fx-background-color: #FFCCBB;
+}
+
+.log-window .list-cell:warn {
+    -fx-background-color: #FFEECC;
+}
+
+.log-window .list-cell:info {
+    -fx-background-color: #FFFFFF;
+}
+
+.log-window .list-cell:debug {
+    -fx-background-color: #EEE9E0;
+}
+
+.log-window .list-cell:trace {
+    -fx-background-color: #EEE9E0;
 }
 
 /*******************************************************************************
@@ -924,6 +1038,14 @@
 
 .small-spinner-pane .jfx-spinner > .arc {
     -fx-stroke-width: 3.0;
+}
+
+.large-spinner-pane .jfx-spinner {
+    -jfx-radius: 20;
+}
+
+.large-spinner-pane .jfx-spinner {
+    -fx-stroke-width: 5.0;
 }
 
 .second-spinner {
@@ -981,32 +1103,20 @@
 *******************************************************************************/
 
 .jfx-combo-box {
-    -jfx-focus-color: -fx-base-check-color;
+   -jfx-focus-color: -fx-base-check-color;
 }
 
-.combo-box-popup .list-view .jfx-list-cell .label,
-.combo-box-popup .list-view .jfx-list-cell:filled:hover .label {
-    -fx-text-fill: BLACK;
+.jfx-combo-box-warning {
+    -jfx-focus-color: #D34336;
+    -jfx-unfocus-color: #D34336;
 }
 
-.combo-box-popup .list-view .jfx-list-cell .custom-jfx-list-view-icon,
-.combo-box-popup .list-view .jfx-list-cell:filled:hover .custom-jfx-list-view-icon,
-.combo-box-popup .list-view .jfx-list-cell:selected .custom-jfx-list-view-icon {
-    -fx-fill: -fx-base-color;
-}
-
-.combo-box-popup .list-view .jfx-list-cell:odd:selected > .jfx-rippler > StackPane,
-.combo-box-popup .list-view .jfx-list-cell:even:selected > .jfx-rippler > StackPane {
-    -fx-background-color: rgba(0.0, 0.0, 255.0, 0.2);
+.jfx-combo-box-warning .text {
+    -fx-fill: #D34336;
 }
 
 .combo-box-popup .list-view .jfx-list-cell {
     -fx-background-insets: 0.0;
-}
-
-.combo-box-popup .list-view .jfx-list-cell:odd,
-.combo-box-popup .list-view .jfx-list-cell:even {
-    -fx-background-color: WHITE;
 }
 
 .combo-box-popup .list-view .jfx-list-cell .jfx-rippler {
@@ -1023,16 +1133,37 @@
     -fx-decorator-color: -fx-base-color;
 }
 
-.jfx-decorator .jfx-decorator-buttons-container {
-    -fx-background-color: -fx-decorator-color;
-}
-
 .jfx-decorator-drawer {
+    -fx-background-color: rgba(244, 244, 244, 0.5);
 }
 
-.resize-border {
-    -fx-border-color: -fx-base-color;
-    -fx-border-width: 0 2 2 2;
+.jfx-decorator-title {
+    -fx-text-fill: -fx-base-text-fill;
+    -fx-font-size: 14;
+}
+
+.jfx-decorator-title:transparent {
+    -fx-text-fill: black;
+}
+
+.jfx-decorator-tab .tab-container .tab-label {
+    -fx-text-fill: -fx-base-disabled-text-fill;
+    -fx-font-size: 14;
+}
+
+.jfx-decorator-tab .tab-container:selected .tab-label {
+    -fx-text-fill: -fx-base-text-fill;
+    -fx-font-weight: BOLD;
+}
+
+.window {
+    -fx-background-color: transparent;
+    -fx-padding: 16;
+}
+
+.body {
+    -fx-border-radius: 5;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.4), 20, 0.3, 0.0, 0.0);
 }
 
 .debug-border {
@@ -1040,12 +1171,16 @@
     -fx-border-width: 1;
 }
 
+.content-background {
+    -fx-background-color: rgba(244, 244, 244, 0.5);
+}
+
 .gray-background {
     -fx-background-color: rgba(244, 244, 244, 0.5);
 }
 
 .white-background {
-    -fx-background-color: rgba(255, 255, 255);
+    -fx-background-color: rgb(255, 255, 255);
 }
 
 /*******************************************************************************
@@ -1053,6 +1188,12 @@
 * Tree Table View                                                              *
 *                                                                              *
 *******************************************************************************/
+
+.no-header .column-header-background {
+    -fx-max-height: 0;
+    -fx-pref-height: 0;
+    -fx-min-height: 0;
+}
 
 .tree-table-view {
     -fx-tree-table-color: rgba(82, 100, 174, 0.4);
@@ -1086,7 +1227,7 @@
 
 .tree-table-view .column-header .label {
     -fx-text-fill: #949494;
-    -fx-padding: 16 0 16 0;
+    -fx-padding: 8 0 8 0;
 }
 
 .tree-table-view .column-header .arrow, .tree-table-view .column-header .sort-order-dot {
@@ -1104,8 +1245,8 @@
 
 .tree-table-view .tree-table-cell {
     -fx-border-width: 0 0 0 0;
-    -fx-padding: 16 0 16 0;
-    -fx-alignment: top-center;
+    -fx-padding: 0 0 0 0;
+    /*-fx-alignment: top-center;*/
 }
 
 .tree-table-view .column-overlay {
@@ -1131,7 +1272,7 @@
 }
 
 .tree-table-row-cell .jfx-text-field {
-    -fx-focus-color: rgba(82, 100, 174);
+    -fx-focus-color: rgb(82, 100, 174);
 }
 
 .tree-table-row-cell .jfx-text-field:error {
@@ -1150,7 +1291,7 @@
 }
 
 .tree-table-row-group {
-    -fx-background-color: rgba(230, 230, 230);
+    -fx-background-color: rgb(230, 230, 230);
 }
 
 .tree-table-view .menu-item:focused {
@@ -1223,6 +1364,14 @@
     -fx-background-color: null;
  }
 
+.scroll-pane .scroll-bar {
+    -fx-skin: "org.jackhuang.hmcl.ui.construct.FloatScrollBarSkin";
+}
+
+.scroll-pane .scroll-bar .track {
+    -fx-fill: transparent;
+}
+
 /*******************************************************************************
 *                                                                              *
 * Error Facade                                                                 *
@@ -1258,12 +1407,3 @@
 .fit-width {
     -fx-pref-width: 100%;
 }
-/*
-.jfx-scroll-pane .main-header {
-    -fx-background-image: url("../bg1.jpg");
-}
-
-.jfx-scroll-pane .condensed-header {
-    -fx-background-image: url("../bg4.jpg");
-}
-*/

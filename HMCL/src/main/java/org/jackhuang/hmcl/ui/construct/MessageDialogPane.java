@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun4008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,7 +13,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.ui.construct;
 
@@ -22,15 +22,23 @@ import javafx.fxml.FXML;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
-
 import org.jackhuang.hmcl.setting.Theme;
 import org.jackhuang.hmcl.ui.FXUtils;
 import org.jackhuang.hmcl.ui.SVG;
-import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
 
 import java.util.Optional;
 
+import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
+
 public final class MessageDialogPane extends StackPane {
+
+    public enum MessageType {
+        ERROR,
+        INFORMATION,
+        WARNING,
+        QUESTION,
+        FINE,
+    }
 
     @FXML
     private JFXButton acceptButton;
@@ -45,7 +53,7 @@ public final class MessageDialogPane extends StackPane {
     @FXML
     private HBox actions;
 
-    public MessageDialogPane(String text, String title, int type, Runnable onAccept) {
+    public MessageDialogPane(String text, String title, MessageType type, Runnable onAccept) {
         FXUtils.loadFXML(this, "/assets/fxml/message-dialog.fxml");
 
         if (title != null)
@@ -60,19 +68,19 @@ public final class MessageDialogPane extends StackPane {
         actions.getChildren().remove(cancelButton);
 
         switch (type) {
-            case MessageBox.INFORMATION_MESSAGE:
+            case INFORMATION:
                 graphic.setGraphic(SVG.infoCircle(Theme.blackFillBinding(), 40, 40));
                 break;
-            case MessageBox.ERROR_MESSAGE:
+            case ERROR:
                 graphic.setGraphic(SVG.closeCircle(Theme.blackFillBinding(), 40, 40));
                 break;
-            case MessageBox.FINE_MESSAGE:
+            case FINE:
                 graphic.setGraphic(SVG.checkCircle(Theme.blackFillBinding(), 40, 40));
                 break;
-            case MessageBox.WARNING_MESSAGE:
+            case WARNING:
                 graphic.setGraphic(SVG.alert(Theme.blackFillBinding(), 40, 40));
                 break;
-            case MessageBox.QUESTION_MESSAGE:
+            case QUESTION:
                 graphic.setGraphic(SVG.helpCircle(Theme.blackFillBinding(), 40, 40));
                 break;
             default:
@@ -81,7 +89,7 @@ public final class MessageDialogPane extends StackPane {
     }
 
     public MessageDialogPane(String text, String title, Runnable onAccept, Runnable onCancel) {
-        this(text, title, MessageBox.QUESTION_MESSAGE, onAccept);
+        this(text, title, MessageType.QUESTION, onAccept);
 
         cancelButton.setVisible(true);
         cancelButton.setOnMouseClicked(e -> {

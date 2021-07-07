@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,40 +13,42 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.game;
 
 import com.google.gson.JsonParseException;
 import com.google.gson.reflect.TypeToken;
-import org.jackhuang.hmcl.download.DependencyManager;
-import org.jackhuang.hmcl.download.game.VersionJsonSaveTask;
+import org.jackhuang.hmcl.download.DefaultDependencyManager;
+import org.jackhuang.hmcl.download.LibraryAnalyzer;
 import org.jackhuang.hmcl.mod.MinecraftInstanceTask;
 import org.jackhuang.hmcl.mod.Modpack;
 import org.jackhuang.hmcl.mod.ModpackConfiguration;
 import org.jackhuang.hmcl.mod.ModpackInstallTask;
 import org.jackhuang.hmcl.setting.Profile;
 import org.jackhuang.hmcl.task.Task;
-import org.jackhuang.hmcl.util.CompressingUtils;
-import org.jackhuang.hmcl.util.Constants;
-import org.jackhuang.hmcl.util.FileUtils;
+import org.jackhuang.hmcl.util.gson.JsonUtils;
+import org.jackhuang.hmcl.util.io.CompressingUtils;
+import org.jackhuang.hmcl.util.io.FileUtils;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Objects;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-public final class HMCLModpackInstallTask extends Task {
+public final class HMCLModpackInstallTask extends Task<Void> {
     private final File zipFile;
     private final String name;
     private final HMCLGameRepository repository;
+    private final DefaultDependencyManager dependency;
     private final Modpack modpack;
-    private final List<Task> dependencies = new LinkedList<>();
-    private final List<Task> dependents = new LinkedList<>();
+    private final List<Task<?>> dependencies = new LinkedList<>();
+    private final List<Task<?>> dependents = new LinkedList<>();
 
     public HMCLModpackInstallTask(Profile profile, File zipFile, Modpack modpack, String name) {
-        DependencyManager dependency = profile.getDependency();
+        dependency = profile.getDependency();
         repository = profile.getRepository();
         this.zipFile = zipFile;
         this.name = name;
@@ -66,7 +68,7 @@ public final class HMCLModpackInstallTask extends Task {
         ModpackConfiguration<Modpack> config = null;
         try {
             if (json.exists()) {
-                config = Constants.GSON.fromJson(FileUtils.readText(json), new TypeToken<ModpackConfiguration<Modpack>>() {
+                config = JsonUtils.GSON.fromJson(FileUtils.readText(json), new TypeToken<ModpackConfiguration<Modpack>>() {
                 }.getType());
 
                 if (!MODPACK_TYPE.equals(config.getType()))
@@ -74,25 +76,43 @@ public final class HMCLModpackInstallTask extends Task {
             }
         } catch (JsonParseException | IOException ignore) {
         }
-        dependents.add(new ModpackInstallTask<>(zipFile, run, "minecraft/", it -> !Objects.equals(it, "minecraft/pack.json"), config));
+        dependents.add(new ModpackInstallTask<>(zipFile, run, modpack.getEncoding(), "/minecraft", it -> !"pack.json".equals(it), config));
+        dependents.add(new MinecraftInstanceTask<>(zipFile, modpack.getEncoding(), "/minecraft", modpack, MODPACK_TYPE, modpack.getName(), modpack.getVersion(), repository.getModpackConfiguration(name)).withStage("hmcl.modpack"));
     }
 
     @Override
-    public List<Task> getDependencies() {
+    public List<Task<?>> getDependencies() {
         return dependencies;
     }
 
     @Override
-    public List<Task> getDependents() {
+    public List<Task<?>> getDependents() {
         return dependents;
     }
 
     @Override
     public void execute() throws Exception {
         String json = CompressingUtils.readTextZipEntry(zipFile, "minecraft/pack.json");
-        Version version = Constants.GSON.fromJson(json, Version.class).setJar(null);
-        dependencies.add(new VersionJsonSaveTask(repository, version));
-        dependencies.add(new MinecraftInstanceTask<>(zipFile, "minecraft/", modpack, MODPACK_TYPE, repository.getModpackConfiguration(name)));
+        Version originalVersion = JsonUtils.GSON.fromJson(json, Version.class).setId(name).setJar(null);
+        LibraryAnalyzer analyzer = LibraryAnalyzer.analyze(originalVersion);
+        Task<Version> libraryTask = Task.supplyAsync(() -> originalVersion);
+        // reinstall libraries
+        // libraries of Forge and OptiFine should be obtained by installation.
+        for (LibraryAnalyzer.LibraryMark mark : analyzer) {
+            if (LibraryAnalyzer.LibraryType.MINECRAFT.getPatchId().equals(mark.getLibraryId()))
+                continue;
+            libraryTask = libraryTask.thenComposeAsync(version -> dependency.installLibraryAsync(modpack.getGameVersion(), version, mark.getLibraryId(), mark.getLibraryVersion()));
+        }
+
+        dependencies.add(libraryTask.thenComposeAsync(repository::saveAsync));
+    }
+
+    @Override
+    public List<String> getStages() {
+        return Stream.concat(
+                dependents.stream().flatMap(task -> task.getStages().stream()),
+                Stream.of("hmcl.modpack")
+        ).collect(Collectors.toList());
     }
 
     public static final String MODPACK_TYPE = "HMCL";

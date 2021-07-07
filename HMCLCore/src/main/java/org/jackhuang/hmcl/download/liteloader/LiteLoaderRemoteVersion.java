@@ -1,6 +1,6 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2017  huangyuhui <huanghongxun2008@126.com>
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -13,24 +13,47 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.download.liteloader;
 
+import org.jackhuang.hmcl.download.DefaultDependencyManager;
+import org.jackhuang.hmcl.download.LibraryAnalyzer;
 import org.jackhuang.hmcl.download.RemoteVersion;
 import org.jackhuang.hmcl.game.Library;
+import org.jackhuang.hmcl.game.Version;
+import org.jackhuang.hmcl.task.Task;
 
 import java.util.Collection;
+import java.util.List;
 
-public class LiteLoaderRemoteVersion extends RemoteVersion<LiteLoaderRemoteVersionTag> {
+public class LiteLoaderRemoteVersion extends RemoteVersion {
+    private final String tweakClass;
+    private final Collection<Library> libraries;
     /**
      * Constructor.
      *
      * @param gameVersion the Minecraft version that this remote version suits.
      * @param selfVersion the version string of the remote version.
-     * @param url         the installer or universal jar URL.
+     * @param urls        the installer or universal jar original URL.
      */
-    LiteLoaderRemoteVersion(String gameVersion, String selfVersion, String url, String tweakClass, Collection<Library> libraries) {
-        super(gameVersion, selfVersion, url, new LiteLoaderRemoteVersionTag(tweakClass, libraries));
+    LiteLoaderRemoteVersion(String gameVersion, String selfVersion, List<String> urls, String tweakClass, Collection<Library> libraries) {
+        super(LibraryAnalyzer.LibraryType.LITELOADER.getPatchId(), gameVersion, selfVersion, urls);
+
+        this.tweakClass = tweakClass;
+        this.libraries = libraries;
+    }
+
+    public Collection<Library> getLibraries() {
+        return libraries;
+    }
+
+    public String getTweakClass() {
+        return tweakClass;
+    }
+
+    @Override
+    public Task<Version> getInstallTask(DefaultDependencyManager dependencyManager, Version baseVersion) {
+        return new LiteLoaderInstallTask(dependencyManager, baseVersion, this);
     }
 }

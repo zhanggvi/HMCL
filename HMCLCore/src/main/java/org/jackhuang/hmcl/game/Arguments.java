@@ -1,7 +1,7 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
- * 
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -13,14 +13,15 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.game;
 
 import com.google.gson.annotations.SerializedName;
 import org.jackhuang.hmcl.util.Immutable;
 import org.jackhuang.hmcl.util.Lang;
-import org.jackhuang.hmcl.util.OperatingSystem;
+import org.jackhuang.hmcl.util.platform.OperatingSystem;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -46,12 +47,22 @@ public final class Arguments {
         this.jvm = jvm;
     }
 
+    @Nullable
     public List<Argument> getGame() {
-        return game == null ? Collections.emptyList() : Collections.unmodifiableList(game);
+        return game == null ? null : Collections.unmodifiableList(game);
     }
 
+    public Arguments withGame(List<Argument> game) {
+        return new Arguments(game, jvm);
+    }
+
+    @Nullable
     public List<Argument> getJvm() {
-        return jvm == null ? Collections.emptyList() : Collections.unmodifiableList(jvm);
+        return jvm == null ? null : Collections.unmodifiableList(jvm);
+    }
+
+    public Arguments withJvm(List<Argument> jvm) {
+        return new Arguments(game, jvm);
     }
 
     public Arguments addGameArguments(String... gameArguments) {
@@ -78,11 +89,13 @@ public final class Arguments {
         else if (b == null)
             return a;
         else
-            return new Arguments(Lang.merge(a.game, b.game), Lang.merge(a.jvm, b.jvm));
+            return new Arguments(
+                    a.game == null && b.game == null ? null : Lang.merge(a.game, b.game),
+                    a.jvm == null && b.jvm == null ? null : Lang.merge(a.jvm, b.jvm));
     }
 
     public static List<String> parseStringArguments(List<String> arguments, Map<String, String> keys) {
-        return arguments.stream().map(str -> keys.getOrDefault(str, str)).collect(Collectors.toList());
+        return arguments.stream().filter(Objects::nonNull).flatMap(str -> new StringArgument(str).toString(keys, Collections.emptyMap()).stream()).collect(Collectors.toList());
     }
 
     public static List<String> parseArguments(List<Argument> arguments, Map<String, String> keys) {
@@ -90,7 +103,7 @@ public final class Arguments {
     }
 
     public static List<String> parseArguments(List<Argument> arguments, Map<String, String> keys, Map<String, Boolean> features) {
-        return arguments.stream().flatMap(arg -> arg.toString(keys, features).stream()).collect(Collectors.toList());
+        return arguments.stream().filter(Objects::nonNull).flatMap(arg -> arg.toString(keys, features).stream()).collect(Collectors.toList());
     }
 
     public static final List<Argument> DEFAULT_JVM_ARGUMENTS;

@@ -1,6 +1,6 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -13,45 +13,50 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl.setting;
 
+import com.google.gson.annotations.JsonAdapter;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonWriter;
 import javafx.beans.binding.Bindings;
 import javafx.beans.binding.ObjectBinding;
 import javafx.scene.paint.Color;
-import org.jackhuang.hmcl.util.FileUtils;
-import org.jackhuang.hmcl.util.IOUtils;
 import org.jackhuang.hmcl.util.Logging;
-
-import com.google.gson.stream.JsonReader;
-import com.google.gson.stream.JsonWriter;
-
-import static org.jackhuang.hmcl.setting.ConfigHolder.CONFIG;
+import org.jackhuang.hmcl.util.ResourceNotFoundError;
+import org.jackhuang.hmcl.util.io.FileUtils;
+import org.jackhuang.hmcl.util.io.IOUtils;
+import org.jackhuang.hmcl.util.javafx.BindingMapping;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Optional;
 import java.util.logging.Level;
 
+import static org.jackhuang.hmcl.setting.ConfigHolder.config;
+
+@JsonAdapter(Theme.TypeAdapter.class)
 public class Theme {
     public static final Theme BLUE = new Theme("blue", "#5C6BC0");
-
+    public static final Color BLACK = Color.web("#292929");
     public static final Color[] SUGGESTED_COLORS = new Color[]{
             Color.web("#5C6BC0"), // blue
             Color.web("#283593"), // dark blue
             Color.web("#43A047"), // green
             Color.web("#E67E22"), // orange
             Color.web("#9C27B0"), // purple
-            Color.web("#F44336")  // red
+            Color.web("#B71C1C")  // red
     };
 
+    private final Color paint;
     private final String color;
     private final String name;
 
     Theme(String name, String color) {
         this.name = name;
         this.color = color;
+        this.paint = Color.web(color);
     }
 
     public String getName() {
@@ -75,23 +80,26 @@ public class Theme {
     }
 
     public String[] getStylesheets() {
+        Color textFill = getForegroundColor();
+
         String css;
         try {
             File temp = File.createTempFile("hmcl", ".css");
-            FileUtils.writeText(temp, IOUtils.readFullyAsString(Theme.class.getResourceAsStream("/assets/css/custom.css"))
+            FileUtils.writeText(temp, IOUtils.readFullyAsString(ResourceNotFoundError.getResourceAsStream("/assets/css/custom.css"))
                     .replace("%base-color%", color)
-                    .replace("%font-color%", getColorDisplayName(getForegroundColor())));
+                    .replace("%base-rippler-color%", String.format("rgba(%d, %d, %d, 0.3)", (int) Math.ceil(paint.getRed() * 256), (int) Math.ceil(paint.getGreen() * 256), (int) Math.ceil(paint.getBlue() * 256)))
+                    .replace("%disabled-font-color%", String.format("rgba(%d, %d, %d, 0.7)", (int) Math.ceil(textFill.getRed() * 256), (int) Math.ceil(textFill.getGreen() * 256), (int) Math.ceil(textFill.getBlue() * 256)))
+                    .replace("%font-color%", getColorDisplayName(getForegroundColor()))
+                    .replace("%font%", Optional.ofNullable(System.getProperty("hmcl.font.override")).map(fontFamily -> "-fx-font-family: " + fontFamily + ";").orElse("")));
             css = temp.toURI().toString();
-        } catch (IOException e) {
+        } catch (IOException | NullPointerException e) {
             Logging.LOG.log(Level.SEVERE, "Unable to create theme stylesheet. Fallback to blue theme.", e);
-            css = Theme.class.getResource("/assets/css/blue.css").toExternalForm();
+            css = "/assets/css/blue.css";
         }
 
         return new String[]{
-                Theme.class.getResource("/css/jfoenix-fonts.css").toExternalForm(),
-                Theme.class.getResource("/css/jfoenix-design.css").toExternalForm(),
                 css,
-                Theme.class.getResource("/assets/css/root.css").toExternalForm()
+                "/assets/css/root.css"
         };
     }
 
@@ -104,6 +112,18 @@ public class Theme {
     public static Optional<Theme> getTheme(String name) {
         if (name == null)
             return Optional.empty();
+        else if (name.equalsIgnoreCase("blue"))
+            return Optional.of(custom("#5C6BC0"));
+        else if (name.equalsIgnoreCase("darker_blue"))
+            return Optional.of(custom("#283593"));
+        else if (name.equalsIgnoreCase("green"))
+            return Optional.of(custom("#43A047"));
+        else if (name.equalsIgnoreCase("orange"))
+            return Optional.of(custom("#E67E22"));
+        else if (name.equalsIgnoreCase("purple"))
+            return Optional.of(custom("#9C27B0"));
+        else if (name.equalsIgnoreCase("red"))
+            return Optional.of(custom("#F44336"));
 
         if (name.startsWith("#"))
             try {
@@ -120,11 +140,12 @@ public class Theme {
     }
 
     public static ObjectBinding<Color> foregroundFillBinding() {
-        return Bindings.createObjectBinding(() -> CONFIG.getTheme().getForegroundColor(), CONFIG.themeProperty());
+        return BindingMapping.of(config().themeProperty())
+                .map(Theme::getForegroundColor);
     }
 
     public static ObjectBinding<Color> blackFillBinding() {
-        return Bindings.createObjectBinding(() -> Color.BLACK);
+        return Bindings.createObjectBinding(() -> BLACK);
     }
 
     public static ObjectBinding<Color> whiteFillBinding() {

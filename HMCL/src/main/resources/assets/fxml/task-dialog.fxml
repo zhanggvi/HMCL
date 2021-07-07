@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import com.jfoenix.controls.JFXButton?>
-<?import com.jfoenix.controls.JFXProgressBar?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.layout.*?>
@@ -9,15 +8,11 @@
 <?import org.jackhuang.hmcl.ui.FXUtils?>
 <fx:root xmlns="http://javafx.com/javafx"
          xmlns:fx="http://javafx.com/fxml"
-         type="StackPane" FXUtils.limitWidth="400" FXUtils.limitHeight="200">
+         type="StackPane" FXUtils.limitWidth="500" FXUtils.limitHeight="300">
     <BorderPane>
-        <top>
-            <JFXProgressBar fx:id="progressBar" StackPane.alignment="TOP_CENTER" />
-        </top>
         <center>
-            <VBox alignment="TOP_CENTER" style="-fx-padding: 16px;">
-                <Label fx:id="lblTitle" style="-fx-font-size: 20px;" />
-                <Label fx:id="lblSubtitle" style="-fx-font-size: 14px;" />
+            <VBox style="-fx-padding: 16px;">
+                <Label fx:id="lblTitle" style="-fx-font-size: 14px; -fx-font-weight: BOLD;" />
 
                 <ScrollPane fitToHeight="true" fitToWidth="true" VBox.vgrow="ALWAYS">
                     <TaskListPane fx:id="taskListPane" />
@@ -25,9 +20,10 @@
             </VBox>
         </center>
         <bottom>
-            <HBox alignment="CENTER_RIGHT" style="-fx-padding: 0 8px 8px 0;">
-                <JFXButton fx:id="btnCancel" text="%button.cancel" />
-            </HBox>
+            <StackPane style="-fx-padding: 0 8px 8px 8px;">
+                <Label StackPane.alignment="CENTER_LEFT" fx:id="lblProgress" />
+                <JFXButton StackPane.alignment="CENTER_RIGHT" fx:id="btnCancel" text="%button.cancel" />
+            </StackPane>
         </bottom>
     </BorderPane>
 </fx:root>

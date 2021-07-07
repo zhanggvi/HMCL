@@ -1,6 +1,6 @@
 /*
- * Hello Minecraft! Launcher.
- * Copyright (C) 2018  huangyuhui <huanghongxun2008@126.com>
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -13,31 +13,59 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see {http://www.gnu.org/licenses/}.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 package org.jackhuang.hmcl;
 
-import static org.jackhuang.hmcl.util.Logging.LOG;
-import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
+import org.jackhuang.hmcl.util.Logging;
+import org.jackhuang.hmcl.util.SelfDependencyPatcher;
 
+import javax.net.ssl.*;
+import javax.swing.*;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.Collections;
 import java.util.logging.Level;
 
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.TrustManagerFactory;
-import javax.net.ssl.X509TrustManager;
-import javax.swing.JOptionPane;
+import static org.jackhuang.hmcl.util.Lang.thread;
+import static org.jackhuang.hmcl.util.Logging.LOG;
+import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
 
 public final class Main {
 
+    private Main() {
+    }
+
     public static void main(String[] args) {
-        checkJavaFX();
+        System.setProperty("java.net.useSystemProxies", "true");
+        System.setProperty("http.agent", "HMCL/" + Metadata.VERSION);
+        System.setProperty("javafx.autoproxy.disable", "true");
+
         checkDirectoryPath();
-        checkDSTRootCAX3();
+
+        // This environment check will take ~300ms
+        thread(() -> {
+            fixLetsEncrypt();
+            checkDSTRootCAX3();
+        }, "CA Certificate Check", true);
+
+        Logging.start(Metadata.HMCL_DIRECTORY.resolve("logs"));
+
+        checkJavaFX();
+
+        // Fix title bar not displaying in GTK systems
+        System.setProperty("jdk.gtk.version", "2");
+
         Launcher.main(args);
     }
 
@@ -52,9 +80,13 @@ public final class Main {
 
     private static void checkJavaFX() {
         try {
-            Class.forName("javafx.application.Application");
-        } catch (ClassNotFoundException e) {
-            showErrorAndExit(i18n("fatal.missing_javafx"));
+            SelfDependencyPatcher.patch();
+        } catch (SelfDependencyPatcher.PatchException e) {
+            LOG.log(Level.SEVERE, "unable to patch JVM", e);
+            showErrorAndExit(i18n("fatal.javafx.missing"));
+        } catch (SelfDependencyPatcher.IncompatibleVersionException e) {
+            LOG.log(Level.SEVERE, "unable to patch JVM", e);
+            showErrorAndExit(i18n("fatal.javafx.incompatible"));
         }
     }
 
@@ -83,7 +115,7 @@ public final class Main {
     /**
      * Indicates that a fatal error has occurred, and that the application cannot start.
      */
-    private static void showErrorAndExit(String message) {
+    static void showErrorAndExit(String message) {
         System.err.println(message);
         System.err.println("A fatal error has occurred, forcibly exiting.");
         JOptionPane.showMessageDialog(null, message, "Error", JOptionPane.ERROR_MESSAGE);
@@ -93,10 +125,40 @@ public final class Main {
     /**
      * Indicates that potential issues have been detected, and that the application may not function properly (but it can still run).
      */
-    private static void showWarningAndContinue(String message) {
+    static void showWarningAndContinue(String message) {
         System.err.println(message);
         System.err.println("Potential issues have been detected.");
         JOptionPane.showMessageDialog(null, message, "Warning", JOptionPane.WARNING_MESSAGE);
     }
 
+    static void fixLetsEncrypt() {
+        try {
+            KeyStore defaultKeyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+            Path ksPath = Paths.get(System.getProperty("java.home"), "lib", "security", "cacerts");
+
+            try (InputStream ksStream = Files.newInputStream(ksPath)) {
+                defaultKeyStore.load(ksStream, "changeit".toCharArray());
+            }
+
+            KeyStore letsEncryptKeyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+            InputStream letsEncryptFile = Main.class.getResourceAsStream("/assets/lekeystore.jks");
+            letsEncryptKeyStore.load(letsEncryptFile, "supersecretpassword".toCharArray());
+
+            KeyStore merged = KeyStore.getInstance(KeyStore.getDefaultType());
+            merged.load(null, new char[0]);
+            for (String alias : Collections.list(letsEncryptKeyStore.aliases()))
+                merged.setCertificateEntry(alias, letsEncryptKeyStore.getCertificate(alias));
+            for (String alias : Collections.list(defaultKeyStore.aliases()))
+                merged.setCertificateEntry(alias, defaultKeyStore.getCertificate(alias));
+
+            TrustManagerFactory instance = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            instance.init(merged);
+            SSLContext tls = SSLContext.getInstance("TLS");
+            tls.init(null, instance.getTrustManagers(), null);
+            HttpsURLConnection.setDefaultSSLSocketFactory(tls.getSocketFactory());
+            LOG.info("Added Lets Encrypt root certificates as additional trust");
+        } catch (KeyStoreException | IOException | NoSuchAlgorithmException | CertificateException | KeyManagementException e) {
+            LOG.log(Level.SEVERE, "Failed to load lets encrypt certificate. Expect problems", e);
+        }
+    }
 }
